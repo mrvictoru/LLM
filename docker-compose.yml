@@ -26,7 +26,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - "./code:/code"
+      - "./src:/code"
     working_dir: /code
     command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
     ports:

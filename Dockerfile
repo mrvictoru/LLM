@@ -7,7 +7,7 @@ RUN apt-get update --fix-missing && apt-get install -y --fix-missing build-essen
 WORKDIR /code
 
 # Copy the code directory contents into the container at /code
-COPY ./code /code
+#COPY ./code /code
 
 COPY ./requirements.txt ./
 
