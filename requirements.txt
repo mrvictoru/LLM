@@ -1,12 +1,10 @@
 jupyter
 numpy
-pandas
 polars
 openai
 crewai
 crewai-tools
 langchain
-langchain-community
 langgraph
 langsmith
 requests
