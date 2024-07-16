@@ -34,7 +34,21 @@ services:
     environment:
       - OPENAI_API_BASE="http://llama_server:8080"
       - OPENAI_API_KEY=no_key
+  
+  mysql_db:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
 
 volumes:
   models:
   code:
+  mysql_data:

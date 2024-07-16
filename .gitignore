@@ -1,4 +1,9 @@
 # llm model weight
 /models
 /testmodel
+
+# sql database
+/mysql-init
+
+# api key
 api_key.json
