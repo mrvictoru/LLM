@@ -21,7 +21,6 @@ services:
               capabilities: [gpu]
 
   python_dev:
-    user: "1000:1000"
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,10 +35,10 @@ services:
       - OPENAI_API_KEY=no_key
   
   mysql_db:
-    image: mysql:5.7
+    image: mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: testdb
+      MYSQL_DATABASE: classicmodels
       MYSQL_USER: user
       MYSQL_PASSWORD: password
     ports:
