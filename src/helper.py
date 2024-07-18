@@ -1,4 +1,5 @@
 import json
+from IPython.display import Image, display
 
 def get_api_key(selection: int) -> str:
     
@@ -14,3 +15,14 @@ def get_api_key(selection: int) -> str:
     selected_key = list(data.keys())[selection]
     
     return data[selected_key]
+
+
+def render_graph(graph):
+    try:
+        # display the graph as a PNG image
+        display(Image(graph.get_graph().draw_mermaid_png()))
+    except Exception:
+        # This requires some extra dependencies and is optional
+        print('Could not render the graph.')
+        print(Exception)
+        pass
