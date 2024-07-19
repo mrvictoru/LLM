@@ -1,12 +1,12 @@
 # Use an official NVIDIA CUDA runtime image
-FROM nvidia/cuda:12.3.2-devel-ubuntu22.04
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 
 RUN apt-get update --fix-missing && \
     apt-get install -y --fix-missing \
     build-essential pkg-config libglib2.0-0 \
     default-libmysqlclient-dev\
     cmake git \
-    python3.11 python3-pip gcc wget \
+    python3.11 python3-pip python3-dev gcc wget \
     ocl-icd-opencl-dev opencl-headers clinfo \
     libclblast-dev libopenblas-dev
     
@@ -26,9 +26,10 @@ ENV LLAMA_CUBLABS=1
 
 RUN pip install -r requirements.txt
 
-# Attempt to locate libcuda.so.1 and create a symbolic link in /usr/lib if found
-RUN find /usr/local/cuda-12.3 /usr/local/cuda -name 'libcuda.so.1' -exec ln -s {} /usr/lib/libcuda.so.1 \; || \
-    echo "libcuda.so.1 not found"
+# Verify libcuda.so.1 exists and create a symbolic link in a more standard location
+RUN find /usr/local/cuda-12.2 -name 'libcuda.so.1' -exec ls -l {} \; && \
+    find /usr/local/cuda-12.2 -name 'libcuda.so.1' -exec ln -s {} /usr/local/lib/libcuda.so.1 \; || \
+    echo "libcuda.so.1 not found in /usr/local/cuda-12.2"
 
 # Set environment variables to ensure the linker finds libcuda
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
