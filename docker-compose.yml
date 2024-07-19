@@ -1,17 +1,16 @@
+version: '0.2'
 services:
-  llama_server:
-    image: ghcr.io/ggerganov/llama.cpp:server-cuda
-    command: [
-      "-m", "models/Phi-3-medium-4k-instruct-Q4_K_M.gguf",
-      "-c", "4096",
-      "--host", "0.0.0.0",
-      "--port", "8080",
-      "--n-gpu-layers", "20000"
-    ]
-    ports:
-      - "8080:8080"
+  python_dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
-      - "./models:/models"
+      - "./src:/code"
+      - "./models:/code/models"
+    working_dir: /code
+    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
+    ports:
+      - "8888:8888"
     deploy:
       resources:
         reservations:
@@ -19,20 +18,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
-  python_dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - "./src:/code"
-    working_dir: /code
-    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
-    ports:
-      - "8888:8888" # Optional: if you plan to run a Jupyter notebook or any web service
-    environment:
-      - OPENAI_API_BASE="http://llama_server:8080"
-      - OPENAI_API_KEY=no_key
   
   mysql_db:
     image: mysql
@@ -48,6 +33,5 @@ services:
       - ./mysql-init:/docker-entrypoint-initdb.d
 
 volumes:
-  models:
   code:
   mysql_data:

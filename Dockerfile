@@ -12,7 +12,11 @@ WORKDIR /code
 
 COPY ./requirements.txt ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Set the CMAKE_ARGS environment variable
+ENV CMAKE_ARGS="-DGGML_CUDA=on"
+
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install llama-cpp-python
 
 # Make port 8888 available to the world outside this container
 EXPOSE 8888
