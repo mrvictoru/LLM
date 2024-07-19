@@ -1,4 +1,4 @@
-version: '0.2'
+version: '0.3cuda'
 services:
   python_dev:
     build:
