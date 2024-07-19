@@ -1,8 +1,17 @@
-# Use an official Python runtime as a parent image
-FROM python:slim
+# Use an official NVIDIA CUDA runtime image
+FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04
 
 RUN apt-get update --fix-missing && \
-    apt-get install -y --fix-missing build-essential pkg-config default-libmysqlclient-dev
+    apt-get install -y --fix-missing \
+    build-essential \
+    pkg-config \
+    libglib2.0-0 \
+    default-libmysqlclient-dev\
+    cmake \
+    git \
+    python3.11 \
+    python3-pip \
+    python3-dev
 
 # Set the working directory in the container
 WORKDIR /code
