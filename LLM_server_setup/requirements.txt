@@ -1,0 +1,11 @@
+jupyter
+numpy
+polars
+openai
+crewai
+crewai-tools
+langchain
+langgraph
+langsmith
+requests
+mysqlclient
