@@ -3,7 +3,7 @@ services:
   python_dev:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: LLM_python_setup/Dockerfile
     volumes:
       - "./src:/code"
       - "./models:/code/models"

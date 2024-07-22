@@ -18,7 +18,7 @@ WORKDIR /code
 # Copy the code directory contents into the container at /code
 #COPY ./code /code
 
-COPY ./requirements.txt ./
+COPY ./LLM_python_setup/requirements.txt ./
 
 # Set the CMAKE_ARGS environment variable
 ENV CUDA_DOCKER_ARCH=all

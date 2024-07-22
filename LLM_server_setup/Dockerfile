@@ -10,7 +10,7 @@ WORKDIR /code
 # Copy the code directory contents into the container at /code
 #COPY ./code /code
 
-COPY ./requirements.txt ./
+COPY ./LLM_server_setup/requirements.txt ./
 
 RUN pip install --no-cache-dir -r requirements.txt
 
