@@ -1,6 +1,6 @@
 version: '0.3cuda'
 services:
-  python_dev:
+  python_dev_llm:
     build:
       context: .
       dockerfile: LLM_python_setup/Dockerfile

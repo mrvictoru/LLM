@@ -1,12 +1,13 @@
+version: '0.3server'
 services:
   llama_server:
     image: ghcr.io/ggerganov/llama.cpp:server-cuda
     command: [
-      "-m", "models/Mistral-Nemo-Instruct-2407-Q5_K_S.gguf",
+      "-m", "models/gemma-2-9b-it-Q5_K_S.gguf",
       "-c", "4096",
       "--host", "0.0.0.0",
       "--port", "8080",
-      "--n-gpu-layers", "20000"
+      "--n-gpu-layers", "100"
     ]
     ports:
       - "8080:8080"
@@ -20,7 +21,7 @@ services:
               count: all
               capabilities: [gpu]
 
-  python_dev:
+  python_dev_standalone:
     build:
       context: .
       dockerfile: LLM_server_setup/Dockerfile
