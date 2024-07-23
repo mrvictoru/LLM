@@ -3,7 +3,7 @@ services:
   llama_server:
     image: ghcr.io/ggerganov/llama.cpp:server-cuda
     command: [
-      "-m", "/home/victoru/LLM/models/xLAM-7b-fc-r.Q4_K_S.gguf",
+      "-m", "./models/xLAM-7b-fc-r.Q4_K_S.gguf",
       "-c", "4096",
       "--host", "0.0.0.0",
       "--port", "8080",

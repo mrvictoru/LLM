@@ -27,7 +27,7 @@ class LLMAgent:
             stream = True
         ):
             msg_content = completion.choices[0].delta.content
-            output += msg_content
+            output += msg_content if msg_content is not None else ""
             if interfer and any(keyword.lower() in output.lower() for keyword in interfer):
                 break
 
@@ -70,13 +70,12 @@ class Tools:
 def generate_example_from_tool(client:openai.OpenAI, toolprompt: str) -> str:
     system_prompt = "You are an advanced AI assistant capable of understanding and demonstrating the use of various tools based on their descriptions. Given the description of a tool, your task is to create a realistic and informative example session that showcases how the tool can be used to solve a problem or perform a task."
     input_prompt = """
-    Based on given description, draft multiple example sessions that includes:
-    1. A Possible question from the user that can utilise a given tool.
-    2. A thought process by the LLM to understand the question and decide which tool to use.
-    3. Select given tool with the fuctnion name and input to the tool. e.g. get_weather('New York')
+    Based on the given tools and their descriptions, draft multiple example sessions that includes:
+    1. A Possible question from the user that can utilise a given tool. e.g. What is the weather like in New York?
+    2. A thought process by the LLM to understand the question and decide which tool to use. e.g. I need to get the weather information for a specific location.
+    3. Select given tool with the fuctnion name and input to the tool, and PAUSE. e.g. get_weather('New York')
     4. Outcome of the tool.
-
-    it is best to include multiple example sessions that showcase the tool in different scenarios or scenarios that require different steps and tools to solve the problem.
+    5. If the answer is found, output it as the Answer and end with COMPLETION.
 
     Please strictly format your response as follows:
     Question:
@@ -88,7 +87,7 @@ def generate_example_from_tool(client:openai.OpenAI, toolprompt: str) -> str:
     Answer:
     COMPLETION
 
-    (here is an example session:
+    (Example session:
 
     Question: What is the mass of Earth times 2?
     Thought: I need to find the mass of Earth
@@ -100,7 +99,7 @@ def generate_example_from_tool(client:openai.OpenAI, toolprompt: str) -> str:
     Observation: 5.972e24
 
     Thought: I need to multiply this by 2
-    Action: calculate(5.972e24 * 2)
+    Action: calculate('5.972e24 * 2')
     PAUSE
 
     You will be called again with this: 
@@ -113,7 +112,8 @@ def generate_example_from_tool(client:openai.OpenAI, toolprompt: str) -> str:
 
     COMPLETION)
 
-    Please generate an example session here:
+    It is best to include multiple example sessions that showcase the tool in different scenarios or scenarios that require different steps and tools to solve the problem.
+    Please generate at least 2 example sessions.
     """
 
     completion = client.chat.completions.create(
