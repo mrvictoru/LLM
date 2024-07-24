@@ -10,9 +10,8 @@ jupyter
 numpy
 polars
 openai
-crewai
-crewai-tools
 langchain
+lanchain_community
 langgraph
 langsmith
 requests
