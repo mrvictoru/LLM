@@ -11,7 +11,8 @@ numpy
 polars
 openai
 langchain
-lanchain_community
+langchain_community
+langchain_openai
 langgraph
 langsmith
 requests

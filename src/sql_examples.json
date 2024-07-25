@@ -1,0 +1,118 @@
+[
+    {
+        "input": "List all customers from the USA.",
+        "query": "SELECT * FROM customers WHERE country = 'USA';"
+    },
+    {
+        "input": "Find the total number of orders placed by each customer.",
+        "query": "SELECT customerNumber, COUNT(orderNumber) AS totalOrders FROM orders GROUP BY customerNumber;"
+    },
+    {
+        "input": "Get the details of employees who report to the President.",
+        "query": "SELECT * FROM employees WHERE reportsTo = (SELECT employeeNumber FROM employees WHERE jobTitle = 'President');"
+    },
+    {
+        "input": "Retrieve the total amount paid by each customer.",
+        "query": "SELECT customerNumber, SUM(amount) AS totalAmountPaid FROM payments GROUP BY customerNumber;"
+    },
+    {
+        "input": "List all products with their respective product lines.",
+        "query": "SELECT productName, productLine FROM products;"
+    },
+    {
+        "input": "Find the total sales amount for each order.",
+        "query": "SELECT orderNumber, SUM(quantityOrdered * priceEach) AS totalSalesAmount FROM orderdetails GROUP BY orderNumber;"
+    },
+    {
+        "input": "Get the contact details of customers who have a credit limit greater than 50,000.",
+        "query": "SELECT customerName, contactLastName, contactFirstName, phone FROM customers WHERE creditLimit > 50000;"
+    },
+    {
+        "input": "List all offices located in the USA.",
+        "query": "SELECT * FROM offices WHERE country = 'USA';"
+    },
+    {
+        "input": "Find the names of customers who have placed orders but have not made any payments.",
+        "query": "SELECT customerName FROM customers WHERE customerNumber IN (SELECT customerNumber FROM orders) AND customerNumber NOT IN (SELECT customerNumber FROM payments);"
+    },
+    {
+        "input": "Retrieve the names and job titles of employees working in the 'Sales' department.",
+        "query": "SELECT firstName, lastName, jobTitle FROM employees WHERE jobTitle LIKE '%Sales%';"
+    },
+    {
+        "input": "List all customers in France with a credit limit over 20,000.",
+        "query": "SELECT * FROM customers WHERE country = 'France' AND creditLimit > 20000;"
+    },
+    {
+        "input": "What is the total number of orders?",
+        "query": "SELECT COUNT(orderNumber) FROM orders;"
+    },
+    {
+        "input": "Get the details of the employee with employee number 1002.",
+        "query": "SELECT * FROM employees WHERE employeeNumber = 1002;"
+    },
+    {
+        "input": "Retrieve the total amount paid by customer number 103.",
+        "query": "SELECT SUM(amount) FROM payments WHERE customerNumber = 103;"
+    },
+    {
+        "input": "List all products with their respective product codes.",
+        "query": "SELECT productName, productCode FROM products;"
+    },
+    {
+        "input": "Find the total sales amount for order number 10100.",
+        "query": "SELECT SUM(quantityOrdered * priceEach) FROM orderdetails WHERE orderNumber = 10100;"
+    },
+    {
+        "input": "Get the contact details of customers who have a credit limit greater than 100,000.",
+        "query": "SELECT customerName, contactLastName, contactFirstName, phone FROM customers WHERE creditLimit > 100000;"
+    },
+    {
+        "input": "List all offices located in the UK.",
+        "query": "SELECT * FROM offices WHERE country = 'UK';"
+    },
+    {
+        "input": "Find the names of customers who have placed orders but have not made any payments.",
+        "query": "SELECT customerName FROM customers WHERE customerNumber IN (SELECT customerNumber FROM orders) AND customerNumber NOT IN (SELECT customerNumber FROM payments);"
+    },
+    {
+        "input": "Retrieve the names and job titles of employees working in the 'Marketing' department.",
+        "query": "SELECT firstName, lastName, jobTitle FROM employees WHERE jobTitle LIKE '%Marketing%';"
+    },
+    {
+        "input": "List all customers in France with a credit limit over 20,000.",
+        "query": "SELECT * FROM customers WHERE country = 'France' AND creditLimit > 20000;"
+    },
+    {
+        "input": "What is the total number of orders?",
+        "query": "SELECT COUNT(orderNumber) FROM orders;"
+    },
+    {
+        "input": "Get the details of the employee with employee number 1002.",
+        "query": "SELECT * FROM employees WHERE employeeNumber = 1002;"
+    },
+    {
+        "input": "Retrieve the total amount paid by customer number 103.",
+        "query": "SELECT SUM(amount) FROM payments WHERE customerNumber = 103;"
+    },
+    {
+        "input": "Get the highest payment amount made by any customer.",
+        "query": "SELECT MAX(amount) FROM payments;"
+    },
+    {
+        "input": "Show product details for products in the 'Motorcycles' product line.",
+        "query": "SELECT * FROM products WHERE productLine = 'Motorcycles';"
+    },
+    {
+        "input": "Retrieve the names of employees who report to employee number 1002.",
+        "query": "SELECT firstName, lastName FROM employees WHERE reportsTo = 1002;"
+    },
+    {
+        "input": "List all products with a stock quantity less than 7000.",
+        "query": "SELECT productName, quantityInStock FROM products WHERE quantityInStock < 7000;"
+    },
+    {
+        "input":"what is price of `1968 Ford Mustang`",
+        "query": "SELECT `buyPrice`, `MSRP` FROM products  WHERE `productName` = '1968 Ford Mustang' LIMIT 1;"
+    }
+  ]

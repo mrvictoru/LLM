@@ -8,7 +8,7 @@ services:
       - "./src:/code"
       - "./models:/code/models"
     working_dir: /code
-    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
+    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--NotebookApp.token='llmpython_4698'"]
     ports:
       - "8888:8888"
     deploy:
