@@ -15,5 +15,6 @@ langchain_community
 langchain_openai
 langgraph
 langsmith
+chromadb
 requests
 mysqlclient

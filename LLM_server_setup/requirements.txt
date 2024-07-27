@@ -5,6 +5,7 @@ openai
 langchain
 langchain_community
 langchain_openai
+chromadb
 langgraph
 langsmith
 requests

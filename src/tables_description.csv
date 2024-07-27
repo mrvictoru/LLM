@@ -1,0 +1,9 @@
+Table Name,Description
+customers,"Stores customer information, including contact details, address, credit limit, and sales representative."
+employees,"Contains employee data, such as names, extensions, email addresses, job titles, and office codes."
+offices,"Holds office information, including city, phone number, address, state, country, and postal code."
+orderdetails,"Records order details, including product codes, quantities, prices, and line numbers."
+orders,"Stores order information, including order dates, required dates, shipped dates, status, and customer numbers."
+payments,"Tracks payment details, including check numbers, payment dates, and amounts."
+productlines,"Describes product lines, with text and HTML descriptions, and optional images."
+products,"Contains product data, including product codes, names, scales, vendors, descriptions, stock quantities, buy prices, and MSRP."
