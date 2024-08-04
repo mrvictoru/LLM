@@ -1,3 +1,16 @@
-This repo contain the docker compose files to start a local LLM server, a jupyternotebook server and a sample SQL server to test local LLM development
+This repo contain the docker compose files to start a local LLM server using Llama CPP, a jupyternotebook server and a sample SQL server to test local LLM development
 
-TODO: add instruction on how to start the server
+Requirement:
+- Have docker and docker compose installed on the system
+- Download GUFF weight you want to use to ./models
+- Have CUDA installed (since my system has CUDA device, if you dont have it you should tweak the docker config accordingly)
+
+Startup:
+- If you want to start a seperate Llama cpp local server from your python environment, run the following in your CLI:
+sudo docker compose -f docker-compose-server.yml up
+
+- To stop and kill the running containers:
+sudo docker compose -f docker-compose-server.yml down -v
+
+- if you want to start a python environment with llama-cpp-python installed, run the following:
+sudo docker compose -f docker-compose-python.yml up
