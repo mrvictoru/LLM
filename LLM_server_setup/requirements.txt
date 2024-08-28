@@ -10,3 +10,8 @@ langgraph
 langsmith
 requests
 mysqlclient
+pymupdf
+tqdm
+setuptools
+wheel
+spacy

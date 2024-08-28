@@ -18,3 +18,8 @@ langsmith
 chromadb
 requests
 mysqlclient
+pymupdf
+tqdm
+setuptools
+wheel
+spacy

@@ -1,5 +1,6 @@
 import json
 from IPython.display import Image, display
+import requests
 
 def get_api_key(selection: int) -> str:
     
@@ -26,3 +27,12 @@ def render_graph(graph):
         print('Could not render the graph.')
         print(Exception)
         pass
+
+# write a helper function to use embedding API to get embeddings of text
+def embedding_text(text, url):
+    url = url + '/embedding'
+    data = {"input":text,}
+    response = requests.post(url, json=data)
+    api_data = response.json()
+
+    return api_data["data"][0]["embedding"]
