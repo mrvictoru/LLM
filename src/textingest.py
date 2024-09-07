@@ -1,7 +1,7 @@
 import fitz
 from tqdm.auto import tqdm
 from spacy.lang.en import English
-from helper import embedding_text
+from helper import Embedding
 
 import re
 
@@ -63,7 +63,7 @@ def open_and_read_pdf(pdf_path: str, chunk_size: int = 10, lang=English()) -> li
 
     return pdf_content
 
-def embed_chunks(pdf_content: list[dict]) -> list[dict]:
+def embed_chunks(pdf_content: list[dict], embedding: Embedding) -> list[dict]:
 
     # Split each chunk into its own item
     pages_and_chunks = []
@@ -82,6 +82,9 @@ def embed_chunks(pdf_content: list[dict]) -> list[dict]:
             chunk_dict["chunk_word_count"] = len([word for word in joined_sentence_chunk.split(" ")])
             chunk_dict["chunk_token_count"] = len(joined_sentence_chunk) / 4 # 1 token = ~4 characters
             
+            # Embed the chunk
+            chunk_dict["embedding"] = embedding.embedding_text(joined_sentence_chunk)
+
             pages_and_chunks.append(chunk_dict)
 
     return pages_and_chunks

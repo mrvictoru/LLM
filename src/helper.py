@@ -28,11 +28,23 @@ def render_graph(graph):
         print(Exception)
         pass
 
-# write a helper function to use embedding API to get embeddings of text
-def embedding_text(text, url):
-    url = url + '/embedding'
-    data = {"input":text,}
-    response = requests.post(url, json=data)
-    api_data = response.json()
-
-    return api_data["data"][0]["embedding"]
+class Embedding:
+    def __init__(self, url):
+        self.url = url
+        self.ping_url(url)
+        
+    def ping_url(self, url):
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            print("URL is reachable")
+        except requests.exceptions.RequestException as e:
+            print("URL is not reachable")
+            raise e
+    
+    def embedding_text(self, text: str):
+        url = self.url + '/embedding'
+        data = {"content": text}
+        response = requests.post(url, json=data)
+        api_data = response.json()
+        return api_data["data"][0]["embedding"]
