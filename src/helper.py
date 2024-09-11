@@ -28,8 +28,8 @@ def render_graph(graph):
         print(Exception)
         pass
 
-class Embedding:
-    def __init__(self, url):
+class LLMAPI:
+    def __init__(self, url: str = "http://llama_server:8080"):
         self.url = url
         self.ping_url(url)
         
@@ -42,9 +42,22 @@ class Embedding:
             print("URL is not reachable")
             raise e
     
+    # this function is used to call the embedding endpoint of the LLM
     def embedding_text(self, text: str):
         url = self.url + '/embedding'
         data = {"content": text}
         response = requests.post(url, json=data)
         api_data = response.json()
         return api_data["data"][0]["embedding"]
+
+    # this function is used to call the completion endpoint of the LLM, not suitable for chat format
+    def invoke(self, text: str, max_tokens: int = 1042, temperature: float = 0.2):
+        url = "http://llama_server:8080/completion"
+        data = {
+            "prompt":text,
+            "max token": max_tokens,
+            "temperature":temperature
+        }
+        response = requests.post(url, json=data)
+        api_data = response.json()
+        return api_data["content"]
