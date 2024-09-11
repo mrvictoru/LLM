@@ -1,90 +1,136 @@
 import fitz
 from tqdm.auto import tqdm
 from spacy.lang.en import English
-from helper import Embedding
+from helper import LLMAPI
 
 import re
+import polars as pl
 
-def chunk_sentences(sentences: list[str], chunk_size: int = 10) -> list[list[str]]:
-    """
-    Chunks a list of sentences into groups of a specified size.
+class PDFDocumentHandler:
+    def __init__(self, pdf_path: str, chunk_size: int = 10, lang=English()):
+        self.pdf_path = pdf_path
+        self.chunk_size = chunk_size
+        self.lang = lang
+        self.pdf_document = None
+        self.pdf_content = None
+        self.pages_and_chunks = None
 
-    Parameters:
-        sentences (list[str]): A list of sentences to be chunked.
-        chunk_size (int): The number of sentences to include in each chunk. Default is 5.
 
-    Returns:
-        list[list[str]]: A list of lists, each containing a chunk of sentences.
-    """
-    return [sentences[i:i + chunk_size] for i in range(0, len(sentences), chunk_size)]
+    def open_pdf(self):
+        self.pdf_document = fitz.open(self.pdf_path)
 
-def open_and_read_pdf(pdf_path: str, chunk_size: int = 10, lang=English()) -> list[dir]:
-    """
-    Opens a PDF file, reads its text content page by page, chunk sentences, and collects statistics.
 
-    Parameters:
-        pdf_path (str): The file path to the PDF document to be opened and read.
-        lang (spacy.lang.Language): The language object from spacy. Default is English.
+    def close_pdf(self):
+        if self.pdf_document:
+            self.pdf_document.close()
 
-    Returns:
-        list[dict]: A list of dictionaries, each containing the page number
-        (adjusted), character count, word count, sentence count, token count, the extracted text, the sentences, and the chunked groups of sentences
-        for each page.
-    """
-    pdf_document = fitz.open(pdf_path)
-    pdf_content = []
-    # add sentencizer to the language object
-    lang.add_pipe("sentencizer")
-    # loop through the pdf page using enumerate
-    for page_num in tqdm(enumerate(pdf_document), total=len(pdf_document), desc="Reading PDF"):
-        page = pdf_document[page_num]
-        text = page.get_text()
-        clean_text = text.replace("\n", " ").strip()
-        # get the sentences from the text using sentencizer
-        sentences = list(str(lang(clean_text).sents))
-        sentence_count = len(sentences)
-        # chunk the sentences into groups of 10
-        chunked_sentences = chunk_sentences(sentences, chunk_size)
-        pdf_content.append(
-            {
-                "page": page_num + 1,
-                "char_count": len(clean_text),
-                "word_count": len(clean_text.split(" ")),
-                "sentence_spacy_count": sentence_count,
-                "chunk_count": chunk_size,
-                "token_count": len(clean_text.split())/4, # rough estimate of tokens
-                "text": clean_text,
-                "sentences": sentences,
-                "sentence_chunks": chunked_sentences,
-            }
-        )
 
-    pdf_document.close()
+    def __chunk_sentences(self, sentences: list[str]) -> list[list[str]]:
+        """
+        Chunks a list of sentences into groups of a specified size.
 
-    return pdf_content
+        Parameters:
+            sentences (list[str]): A list of sentences to be chunked.
 
-def embed_chunks(pdf_content: list[dict], embedding: Embedding) -> list[dict]:
+        Returns:
+            list[list[str]]: A list of lists, each containing a chunk of sentences.
+        """
+        return [sentences[i:i + self.chunk_size] for i in range(0, len(sentences), self.chunk_size)]
 
-    # Split each chunk into its own item
-    pages_and_chunks = []
-    for item in tqdm(pdf_content):
-        for sentence_chunk in item["sentence_chunks"]:
-            chunk_dict = {}
-            chunk_dict["page_number"] = item["page_number"]
-            
-            # Join the sentences together into a paragraph-like structure, aka a chunk (so they are a single string)
-            joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
-            joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk) # ".A" -> ". A" for any full-stop/capital letter combo 
-            chunk_dict["sentence_chunk"] = joined_sentence_chunk
+    def read_pdf(self) -> pl.DataFrame:
+        """
+        Reads the PDF document, extracts text content page by page, chunks sentences, and collects statistics.
 
-            # Get stats about the chunk
-            chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
-            chunk_dict["chunk_word_count"] = len([word for word in joined_sentence_chunk.split(" ")])
-            chunk_dict["chunk_token_count"] = len(joined_sentence_chunk) / 4 # 1 token = ~4 characters
-            
-            # Embed the chunk
-            chunk_dict["embedding"] = embedding.embedding_text(joined_sentence_chunk)
+        Returns:
+            pd.DataFrame: A pandas DataFrame containing the page number
+            (adjusted), character count, word count, sentence count, token count, the extracted text, the sentences, and the chunked groups of sentences
+            for each page.
+        """
+        if not self.pdf_document:
+            self.open_pdf()
 
-            pages_and_chunks.append(chunk_dict)
+        pdf_content = []
+        # add sentencizer to the language object
+        self.lang.add_pipe("sentencizer")
+        # loop through the pdf page using enumerate
+        for page_num in tqdm(enumerate(self.pdf_document), total=len(self.pdf_document), desc="Reading PDF"):
+            page = self.pdf_document[page_num]
+            text = page.get_text()
+            clean_text = text.replace("\n", " ").strip()
+            # get the sentences from the text using sentencizer
+            sentences = list(str(self.lang(clean_text).sents))
+            sentence_count = len(sentences)
+            # chunk the sentences into groups of 10
+            chunked_sentences = self.__chunk_sentences(sentences)
+            pdf_content.append(
+                {
+                    "page": page_num + 1,
+                    "char_count": len(clean_text),
+                    "word_count": len(clean_text.split(" ")),
+                    "sentence_spacy_count": sentence_count,
+                    "chunk_count": self.chunk_size,
+                    "token_count": len(clean_text.split()) / 4,  # rough estimate of tokens
+                    "text": clean_text,
+                    "sentences": sentences,
+                    "sentence_chunks": chunked_sentences,
+                }
+            )
 
-    return pages_and_chunks
+        self.pdf_content = pl.DataFrame(pdf_content)
+        return self.pdf_content
+
+
+    def __process_sentence_chunk(self, sentence_chunk, embedding):
+        joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
+        joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk)  # ".A" -> ". A"
+        chunk_char_count = len(joined_sentence_chunk)
+        chunk_word_count = len(joined_sentence_chunk.split(" "))
+        chunk_token_count = chunk_char_count / 4  # 1 token = ~4 characters
+        embedding_result = embedding.embedding_text(joined_sentence_chunk)
+        return joined_sentence_chunk, chunk_char_count, chunk_word_count, chunk_token_count, embedding_result
+
+    def embed_chunks(self, embedding: LLMAPI) -> pl.DataFrame:
+        """
+        Embeds the chunks of sentences using the specified embedding model.
+
+        Parameters:
+            embedding (LLMAPI): The embedding model to use for embedding the chunks.
+
+        Returns:
+            pd.DataFrame: A pandas DataFrame containing the page number, sentence chunk, chunk statistics, and the embedded chunk.
+        """
+        if not self.pdf_content:
+            self.read_pdf()
+
+        # Explode the sentence_chunks column to have one row per chunk
+        temp_df = self.pdf_content.explode("sentence_chunks")
+
+        # Apply the processing function to each chunk
+        temp_df = temp_df.with_columns([pl.col("sentence_chunks").apply(lambda x: self.__process_sentence_chunk(x, embedding)).alias("processed_chunk")])
+
+        # Split the processed_chunk column into separate columns
+        temp_df = temp_df.with_columns([
+            pl.col("processed_chunk").arr.get(0).alias("sentence_chunk"),
+            pl.col("processed_chunk").arr.get(1).alias("chunk_char_count"),
+            pl.col("processed_chunk").arr.get(2).alias("chunk_word_count"),
+            pl.col("processed_chunk").arr.get(3).alias("chunk_token_count"),
+            pl.col("processed_chunk").arr.get(4).alias("embedding"),
+        ]).drop("processed_chunk")
+
+        self.pages_and_chunks = temp_df
+        return self.pages_and_chunks
+
+
+    def graph_extraction(self, nlp: LLMAPI) -> pl.DataFrame:
+        """
+        Extracts entities and relationships from the sentences chunks by prompting the NLP model.
+
+        Parameters:
+            nlp (LLMAPI): The NLP model to use for entity and relationship extraction.
+
+        Returns:
+            pd.DataFrame: A pandas DataFrame containing the page number, entity, relationship, and the extracted text.
+        """
+
+
+        ### TODO: Implement entity and relationship extraction using the NLP model, as well as relevant prompts for the model.
