@@ -6,11 +6,14 @@ from helper import LLMAPI
 import re
 import polars as pl
 
+from prompt import graph_extraction_prompt
+
 class PDFDocumentHandler:
-    def __init__(self, pdf_path: str, chunk_size: int = 10, lang=English()):
+    def __init__(self, pdf_path: str, prompt: str = None, chunk_size: int = 10, lang=English()):
         self.pdf_path = pdf_path
         self.chunk_size = chunk_size
         self.lang = lang
+        self.prompt = prompt or graph_extraction_prompt
         self.pdf_document = None
         self.pdf_content = None
         self.pages_and_chunks = None
@@ -120,10 +123,13 @@ class PDFDocumentHandler:
         self.pages_and_chunks = temp_df
         return self.pages_and_chunks
 
+    def __get_graph(self, text:str, nlp: LLMAPI):
+        formatted_prompt = self.prompt.format(text=text)
+        return nlp.invoke(formatted_prompt)
 
     def graph_extraction(self, nlp: LLMAPI) -> pl.DataFrame:
         """
-        Extracts entities and relationships from the sentences chunks by prompting the NLP model.
+        Extracts entities and relationships and store it in a new column in self.pages_and_chunks from the sentences chunks from self.pages_and_chunks by prompting the NLP model.
 
         Parameters:
             nlp (LLMAPI): The NLP model to use for entity and relationship extraction.
@@ -132,5 +138,13 @@ class PDFDocumentHandler:
             pd.DataFrame: A pandas DataFrame containing the page number, entity, relationship, and the extracted text.
         """
 
-
         ### TODO: Implement entity and relationship extraction using the NLP model, as well as relevant prompts for the model.
+
+        if not self.pages_and_chunks:
+            self.embed_chunks(nlp)
+
+        # for each sentence chunk, prompt the model and store the result in a new column
+        temp_df = self.pages_and_chunks.with_columns([
+            pl.col("sentence_chunk").apply(lambda x: self.__get_graph(x,nlp)).alias("graph_extraction")
+        ])
+
