@@ -51,15 +51,17 @@ class PDFDocumentHandler:
             for each page.
         """
         if not self.pdf_document:
+            print("Opening PDF document...")
             self.open_pdf()
 
         pdf_content = []
         # add sentencizer to the language object
         self.lang.add_pipe("sentencizer")
         # loop through the pdf page using enumerate
-        for page_num in tqdm(enumerate(self.pdf_document), total=len(self.pdf_document), desc="Reading PDF"):
-            page = self.pdf_document[page_num]
-            text = page.get_text()
+        print("Loading PDF document...")
+        for iter_page in tqdm(enumerate(self.pdf_document), total=len(self.pdf_document), desc="Reading PDF"):
+            page_num = iter_page[0]
+            text = iter_page[1].get_text()
             clean_text = text.replace("\n", " ").strip()
             # get the sentences from the text using sentencizer
             sentences = list(str(self.lang(clean_text).sents))
