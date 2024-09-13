@@ -5,6 +5,7 @@ from helper import LLMAPI
 
 import re
 import polars as pl
+import json
 
 from prompt import graph_extraction_prompt
 
@@ -104,7 +105,7 @@ class PDFDocumentHandler:
         """
         if not self.pdf_content:
             self.read_pdf()
-
+        temp_df = self.pdf_content.select(["page", "token_count", "sentence_chunks"])
         # Explode the sentence_chunks column to have one row per chunk
         temp_df = self.pdf_content.explode("sentence_chunks")
 
@@ -117,7 +118,7 @@ class PDFDocumentHandler:
             pl.col("processed_chunk").arr.get(1).alias("chunk_char_count"),
             pl.col("processed_chunk").arr.get(2).alias("chunk_word_count"),
             pl.col("processed_chunk").arr.get(3).alias("chunk_token_count"),
-            pl.col("processed_chunk").arr.get(4).alias("embedding"),
+            pl.col("processed_chunk").arr.get(4).alias("embedding")
         ]).drop("processed_chunk")
 
         self.pages_and_chunks = temp_df
@@ -125,7 +126,13 @@ class PDFDocumentHandler:
 
     def __get_graph(self, text:str, nlp: LLMAPI):
         formatted_prompt = self.prompt.format(text=text)
-        return nlp.invoke(formatted_prompt)
+        output = nlp.invoke(formatted_prompt)
+        # check if the output is valid JSON
+        try:
+            json_output = json.loads(output)
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON output from the NLP model.")
+        return json_output
 
     def graph_extraction(self, nlp: LLMAPI) -> pl.DataFrame:
         """
@@ -138,13 +145,17 @@ class PDFDocumentHandler:
             pd.DataFrame: A pandas DataFrame containing the page number, entity, relationship, and the extracted text.
         """
 
-        ### TODO: Implement entity and relationship extraction using the NLP model, as well as relevant prompts for the model.
-
         if not self.pages_and_chunks:
             self.embed_chunks(nlp)
-
+        temp_df = self.pages_and_chunks.explode("sentence_chunk")
         # for each sentence chunk, prompt the model and store the result in a new column
-        temp_df = self.pages_and_chunks.with_columns([
+        temp_df = temp_df.with_columns([
             pl.col("sentence_chunk").apply(lambda x: self.__get_graph(x,nlp)).alias("graph_extraction")
         ])
+
+        # add graph_extraction column to the pages_and_chunks dataframe
+        self.pages_and_chunks = temp_df
+
+        # return only the relevant columns such as page, sentence_chunk, graph_extraction
+        return self.pages_and_chunks.select(["page", "sentence_chunk", "graph_extraction"])
 
