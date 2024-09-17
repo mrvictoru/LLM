@@ -64,7 +64,9 @@ class PDFDocumentHandler:
             text = iter_page[1].get_text()
             clean_text = text.replace("\n", " ").strip()
             # get the sentences from the text using sentencizer
-            sentences = list(str(self.lang(clean_text).sents))
+            sentencizer = self.lang(clean_text).sents
+            # loop through the sentences and store them in a list
+            sentences = [str(sent.text) for sent in sentencizer]
             sentence_count = len(sentences)
             # chunk the sentences into groups of 10
             chunked_sentences = self.__chunk_sentences(sentences)
