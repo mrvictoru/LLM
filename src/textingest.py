@@ -85,7 +85,7 @@ class PDFDocumentHandler:
                 }
             )
         self.pdf_content = pdf_content
-        return pl.Dataframe(pdf_content)
+        return pl.DataFrame(pdf_content)
 
 
     def __process_sentence_chunk(self, sentence_chunk, embedding):
@@ -125,7 +125,7 @@ class PDFDocumentHandler:
                 pages_and_chunks.append(chunk_dict)
 
         self.pages_and_chunks = pages_and_chunks
-        return pl.Dataframe(pages_and_chunks)
+        return pl.DataFrame(pages_and_chunks)
 
     def __get_graph(self, text:str, nlp: LLMAPI):
         formatted_prompt = self.prompt.format(text=text)
@@ -150,11 +150,7 @@ class PDFDocumentHandler:
 
         if self.pages_and_chunks is None:
             self.embed_chunks(nlp)
-        temp_df = self.pages_and_chunks.explode("sentence_chunk")
-        # for each sentence chunk, prompt the model and store the result in a new column
-        temp_df = temp_df.with_columns([
-            pl.col("sentence_chunk").map(lambda x: self.__get_graph(x,nlp)).alias("graph_extraction")
-        ])
+        
 
         # add graph_extraction column to the pages_and_chunks dataframe
         self.pages_and_chunks = temp_df

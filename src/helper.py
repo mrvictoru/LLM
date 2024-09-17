@@ -48,11 +48,11 @@ class LLMAPI:
         data = {"content": text}
         response = requests.post(url, json=data)
         api_data = response.json()
-        return api_data["data"][0]["embedding"]
+        return api_data["embedding"]
 
     # this function is used to call the completion endpoint of the LLM, not suitable for chat format
     def invoke(self, text: str, max_tokens: int = 1042, temperature: float = 0.2):
-        url = "http://llama_server:8080/completion"
+        url = self.url + "/completion"
         data = {
             "prompt":text,
             "max token": max_tokens,
