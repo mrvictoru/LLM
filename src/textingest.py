@@ -9,6 +9,7 @@ import json
 
 from prompt import graph_extraction_prompt
 
+
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, prompt: str = None, chunk_size: int = 10, lang=English()):
         self.pdf_path = pdf_path
@@ -50,7 +51,7 @@ class PDFDocumentHandler:
             (adjusted), character count, word count, sentence count, token count, the extracted text, the sentences, and the chunked groups of sentences
             for each page.
         """
-        if not self.pdf_document:
+        if self.pdf_document is None:
             print("Opening PDF document...")
             self.open_pdf()
 
@@ -83,9 +84,8 @@ class PDFDocumentHandler:
                     "sentence_chunks": chunked_sentences,
                 }
             )
-
-        self.pdf_content = pl.DataFrame(pdf_content)
-        return self.pdf_content
+        self.pdf_content = pdf_content
+        return pl.Dataframe(pdf_content)
 
 
     def __process_sentence_chunk(self, sentence_chunk, embedding):
@@ -107,26 +107,25 @@ class PDFDocumentHandler:
         Returns:
             pd.DataFrame: A pandas DataFrame containing the page number, sentence chunk, chunk statistics, and the embedded chunk.
         """
-        if not self.pdf_content:
+        if self.pdf_content is None:
             self.read_pdf()
-        temp_df = self.pdf_content.select(["page", "token_count", "sentence_chunks"])
-        # Explode the sentence_chunks column to have one row per chunk
-        temp_df = self.pdf_content.explode("sentence_chunks")
+        pages_and_chunks = []
+        for page in tqdm(self.pdf_content):
+            for sentence_chunk in page["sentence_chunks"]:
+                chunk_dict = {}
+                chunk_dict["page"] = page["page"]
+                joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
+                joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk)  # ".A" -> ". A"
+                chunk_dict["sentence_chunk"] = joined_sentence_chunk
+                chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
+                chunk_dict["chunk_word_count"] = len(joined_sentence_chunk.split(" "))
+                chunk_dict["chunk_token_count"] = chunk_dict["chunk_char_count"] / 4  # 1 token = ~4 characters
+                chunk_dict["embedding"] = embedding.embedding_text(joined_sentence_chunk)
 
-        # Apply the processing function to each chunk
-        temp_df = temp_df.with_columns([pl.col("sentence_chunks").apply(lambda x: self.__process_sentence_chunk(x, embedding)).alias("processed_chunk")])
+                pages_and_chunks.append(chunk_dict)
 
-        # Split the processed_chunk column into separate columns
-        temp_df = temp_df.with_columns([
-            pl.col("processed_chunk").arr.get(0).alias("sentence_chunk"),
-            pl.col("processed_chunk").arr.get(1).alias("chunk_char_count"),
-            pl.col("processed_chunk").arr.get(2).alias("chunk_word_count"),
-            pl.col("processed_chunk").arr.get(3).alias("chunk_token_count"),
-            pl.col("processed_chunk").arr.get(4).alias("embedding")
-        ]).drop("processed_chunk")
-
-        self.pages_and_chunks = temp_df
-        return self.pages_and_chunks
+        self.pages_and_chunks = pages_and_chunks
+        return pl.Dataframe(pages_and_chunks)
 
     def __get_graph(self, text:str, nlp: LLMAPI):
         formatted_prompt = self.prompt.format(text=text)
@@ -149,12 +148,12 @@ class PDFDocumentHandler:
             pd.DataFrame: A pandas DataFrame containing the page number, entity, relationship, and the extracted text.
         """
 
-        if not self.pages_and_chunks:
+        if self.pages_and_chunks is None:
             self.embed_chunks(nlp)
         temp_df = self.pages_and_chunks.explode("sentence_chunk")
         # for each sentence chunk, prompt the model and store the result in a new column
         temp_df = temp_df.with_columns([
-            pl.col("sentence_chunk").apply(lambda x: self.__get_graph(x,nlp)).alias("graph_extraction")
+            pl.col("sentence_chunk").map(lambda x: self.__get_graph(x,nlp)).alias("graph_extraction")
         ])
 
         # add graph_extraction column to the pages_and_chunks dataframe
