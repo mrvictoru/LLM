@@ -7,18 +7,29 @@ import re
 import polars as pl
 import json
 
-from prompt import graph_extraction_prompt
+from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt
+
+
 
 
 class PDFDocumentHandler:
-    def __init__(self, pdf_path: str, prompt: str = None, chunk_size: int = 10, lang=English()):
+    def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10, lang=English()):
         self.pdf_path = pdf_path
         self.chunk_size = chunk_size
         self.lang = lang
-        self.prompt = prompt or graph_extraction_prompt
+
+        if dict_prompt is None:
+            dict_prompt = {
+                "graph_extraction_prompt": graph_extraction_prompt,
+                "json_formatting_prompt": json_formatting_prompt,
+                "example_1_prompt": example_1_prompt,
+                "example_2_prompt": example_2_prompt,
+            }
+        self.dict_prompt = dict_prompt
         self.pdf_document = None
         self.pdf_content = None
         self.pages_and_chunks = None
+        self.chunks_and_graphs = None
 
 
     def open_pdf(self):
@@ -110,7 +121,7 @@ class PDFDocumentHandler:
         if self.pdf_content is None:
             self.read_pdf()
         pages_and_chunks = []
-        for page in tqdm(self.pdf_content):
+        for page in tqdm(self.pdf_content, desc="Embedding sentence chunks"):
             for sentence_chunk in page["sentence_chunks"]:
                 chunk_dict = {}
                 chunk_dict["page"] = page["page"]
@@ -128,12 +139,14 @@ class PDFDocumentHandler:
         return pl.DataFrame(pages_and_chunks)
 
     def __get_graph(self, text:str, nlp: LLMAPI):
-        formatted_prompt = self.prompt.format(text=text)
+        main_prompt = self.dict_prompt["graph_extraction_prompt"]
+        formatted_prompt = main_prompt.format(json_formatting_prompt=self.dict_prompt["json_formatting_prompt"], example_1_prompt=self.dict_prompt["example_1_prompt"], example_2_prompt=self.dict_prompt["example_2_prompt"], text=text)
         output = nlp.invoke(formatted_prompt)
         # check if the output is valid JSON
         try:
             json_output = json.loads(output)
         except json.JSONDecodeError:
+            print(output)
             raise ValueError("Invalid JSON output from the NLP model.")
         return json_output
 
@@ -150,11 +163,16 @@ class PDFDocumentHandler:
 
         if self.pages_and_chunks is None:
             self.embed_chunks(nlp)
-        
+        chunks_and_graphs = []
+        # loop through the sentence_chunk and create graph using __get_graph
+        for chunk in tqdm(self.pages_and_chunks, desc="Extracting entities and relationships"):
+            graph = {}
+            graph["page"] = chunk["page"]
+            graph["sentence_chunk"] = chunk["sentence_chunk"]
+            graph["graph_extraction"] = self.__get_graph(chunk["sentence_chunk"], nlp)
+            chunks_and_graphs.append(graph)
 
-        # add graph_extraction column to the pages_and_chunks dataframe
-        self.pages_and_chunks = temp_df
+        self.chunks_and_graphs = chunks_and_graphs
 
-        # return only the relevant columns such as page, sentence_chunk, graph_extraction
-        return self.pages_and_chunks.select(["page", "sentence_chunk", "graph_extraction"])
+        return pl.DataFrame(chunks_and_graphs)
 
