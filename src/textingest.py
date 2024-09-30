@@ -9,6 +9,8 @@ import json
 
 from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt
 
+from neo4j import GraphDatabase
+
 
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10, lang=English()):
