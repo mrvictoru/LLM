@@ -1,0 +1,53 @@
+version: '0.4server-graph'
+services:
+  llama_server:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    command: [
+      "-m", "./models/Mistral-Nemo-Instruct-2407.Q6_K.gguf",
+      "-t", "20",
+      "-c", "4096",
+      "--host", "0.0.0.0",
+      "--port", "8080",
+      "--n-gpu-layers", "100"
+    ]
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./models:/models"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  
+  python_dev_standalone:
+    build:
+      context: .
+      dockerfile: LLM_graph_setup/Dockerfile
+    volumes:
+      - "./src:/code"
+    working_dir: /code
+    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--NotebookApp.token='llmpython_4698'"]
+    ports:
+      - "8888:8888" # Optional: if you plan to run a Jupyter notebook or any web service
+    environment:
+      - OPENAI_API_BASE="http://llama_server:8080"
+      - OPENAI_API_KEY=no_key
+  
+  neo4j_db:
+    image: neo4j:latest
+    environment:
+      NEO4J_AUTH: none
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
+
+volumes:
+  models:
+  code:
+  neo4j_data:

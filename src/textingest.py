@@ -10,8 +10,6 @@ import json
 from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt
 
 
-
-
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10, lang=English()):
         self.pdf_path = pdf_path
@@ -176,3 +174,20 @@ class PDFDocumentHandler:
 
         return pl.DataFrame(chunks_and_graphs)
 
+
+class GraphDatabaseConnection:
+    def __init__(self, uri, user, password):
+        if not uri or not user or not password:
+            raise ValueError(
+                "URI, user, and password must be provided to initialize the DatabaseConnection.")
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+
+    def close(self):
+        self.driver.close()
+
+    def get_session(self):
+        return self.driver.session()
+
+    def clear_database(self):
+        with self.get_session() as session:
+            session.run("MATCH (n) DETACH DELETE n")
