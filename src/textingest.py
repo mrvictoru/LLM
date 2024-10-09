@@ -6,6 +6,7 @@ from helper import LLMAPI
 import re
 import polars as pl
 import json
+import numpy as np
 
 from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt
 
@@ -99,15 +100,6 @@ class PDFDocumentHandler:
         return pl.DataFrame(pdf_content)
 
 
-    def __process_sentence_chunk(self, sentence_chunk, embedding):
-        joined_sentence_chunk = "".join(sentence_chunk).replace("  ", " ").strip()
-        joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk)  # ".A" -> ". A"
-        chunk_char_count = len(joined_sentence_chunk)
-        chunk_word_count = len(joined_sentence_chunk.split(" "))
-        chunk_token_count = chunk_char_count / 4  # 1 token = ~4 characters
-        embedding_result = embedding.embedding_text(joined_sentence_chunk)
-        return joined_sentence_chunk, chunk_char_count, chunk_word_count, chunk_token_count, embedding_result
-
     def embed_chunks(self, embedding: LLMAPI) -> pl.DataFrame:
         """
         Embeds the chunks of sentences using the specified embedding model.
@@ -176,6 +168,48 @@ class PDFDocumentHandler:
 
         return pl.DataFrame(chunks_and_graphs)
 
+
+def calc_cosine_sim(vector1: np.ndarray, vector2: np.ndarray) -> float:
+    """
+    Calculate the cosine similarity between two vectors using NumPy.
+
+    Parameters:
+        vector1 (np.ndarray): The first vector.
+        vector2 (np.ndarray): The second vector.
+
+    Returns:
+        float: The cosine similarity between the two vectors.
+    """
+    dot_product = np.dot(vector1, vector2)
+    norm_vector1 = np.linalg.norm(vector1)
+    norm_vector2 = np.linalg.norm(vector2)
+    return dot_product / (norm_vector1 * norm_vector2)
+
+def find_similar_chunks(prompt_embedding: np.ndarray, pages_and_chunks: pl.Dataframe, threshold=0.5):
+    """
+    Find the cosine similarity between a prompt embedding and all the embeddings from embedded sentence chunks,
+    and filter the results to only include rows with a cosine similarity above a certain threshold.
+
+    Parameters:
+        prompt_embedding: The prompt_embedding to compare.
+        pages_and_chunks_df (pl.DataFrame): The Polars DataFrame containing page information and embeddings.
+        threshold (float): The cosine similarity threshold for filtering the results.
+
+    Returns:
+        pl.DataFrame: A Polars DataFrame containing the page number, sentence chunk, and cosine similarity score.
+    """
+    # Calculate cosine similarity for each row
+    def cosine_similarity_row(row):
+        return calc_cosine_sim(prompt_embedding, row["embedding"])
+
+    similarities_df = pages_and_chunks.with_column(
+        pl.col("embedding").apply(cosine_similarity_row).alias("similarity")
+    )
+
+    # Filter rows based on the threshold
+    filtered_df = similarities_df.filter(pl.col("similarity") > threshold)
+
+    return filtered_df.select(["page", "sentence_chunk", "similarity"])
 
 class GraphDatabaseConnection:
     def __init__(self, uri, user, password):
