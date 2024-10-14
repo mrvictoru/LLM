@@ -123,7 +123,7 @@ class PDFDocumentHandler:
                 chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
                 chunk_dict["chunk_word_count"] = len(joined_sentence_chunk.split(" "))
                 chunk_dict["chunk_token_count"] = chunk_dict["chunk_char_count"] / 4  # 1 token = ~4 characters
-                chunk_dict["embedding"] = embedding.embedding_text(joined_sentence_chunk)
+                chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
 
                 pages_and_chunks.append(chunk_dict)
 
@@ -169,26 +169,11 @@ class PDFDocumentHandler:
         return pl.DataFrame(chunks_and_graphs)
 
 
-def calc_cosine_sim(vector1: np.ndarray, vector2: np.ndarray) -> float:
-    """
-    Calculate the cosine similarity between two vectors using NumPy.
-
-    Parameters:
-        vector1 (np.ndarray): The first vector.
-        vector2 (np.ndarray): The second vector.
-
-    Returns:
-        float: The cosine similarity between the two vectors.
-    """
-    dot_product = np.dot(vector1, vector2)
-    norm_vector1 = np.linalg.norm(vector1)
-    norm_vector2 = np.linalg.norm(vector2)
-    return dot_product / (norm_vector1 * norm_vector2)
-
-def find_similar_chunks(prompt_embedding: np.ndarray, pages_and_chunks: pl.Dataframe, threshold=0.5):
+def find_similar_chunk_np(prompt_embedding: np.ndarray, pages_and_chunks, threshold=0.5):
     """
     Find the cosine similarity between a prompt embedding and all the embeddings from embedded sentence chunks,
     and filter the results to only include rows with a cosine similarity above a certain threshold.
+
 
     Parameters:
         prompt_embedding: The prompt_embedding to compare.
@@ -198,18 +183,28 @@ def find_similar_chunks(prompt_embedding: np.ndarray, pages_and_chunks: pl.Dataf
     Returns:
         pl.DataFrame: A Polars DataFrame containing the page number, sentence chunk, and cosine similarity score.
     """
-    # Calculate cosine similarity for each row
-    def cosine_similarity_row(row):
-        return calc_cosine_sim(prompt_embedding, row["embedding"])
+    # Get the embeddings as a NumPy array
+    embeddings_np = np.stack(pages_and_chunks["embedding"].to_numpy())
+    # Stack the prompt as a NumPy array
+    prompt_np = np.stack([prompt_embedding] * embeddings_np.shape[0])
 
-    similarities_df = pages_and_chunks.with_column(
-        pl.col("embedding").apply(cosine_similarity_row).alias("similarity")
-    )
+    # Normalize the text embeddings
+    norm_text_embeddings = embeddings_np / np.linalg.norm(embeddings_np, axis=1, keepdims=True)
+
+    # Normalize the prompt embeddings
+    norm_prompt_embeddings = prompt_np / np.linalg.norm(prompt_np, axis=1, keepdims=True)
+
+    # Calculate the cosine similarity
+    cosine_similarity = np.diag(np.dot(norm_text_embeddings, norm_prompt_embeddings.T))
+
+    # take each element in the array and add it as a row in a new column to the dataframe
+    df = pages_and_chunks.with_columns(pl.Series("cosine_similarity", cosine_similarity))
 
     # Filter rows based on the threshold
-    filtered_df = similarities_df.filter(pl.col("similarity") > threshold)
+    df = df.filter(pl.col("cosine_similarity") > threshold)
+    sorted_df = df.sort("cosine_similarity", descending=True)
 
-    return filtered_df.select(["page", "sentence_chunk", "similarity"])
+    return sorted_df.select(["page", "sentence_chunk", "cosine_similarity"])
 
 class GraphDatabaseConnection:
     def __init__(self, uri, user, password):
