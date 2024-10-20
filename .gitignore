@@ -11,3 +11,6 @@ src/nvidiaapi
 
 # testinput
 src/testinput
+
+# testoutput
+src/testoutput

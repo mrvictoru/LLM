@@ -7,11 +7,11 @@ import re
 import polars as pl
 import json
 import numpy as np
+import os
 
 from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt
 
 from neo4j import GraphDatabase
-
 
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10, lang=English()):
@@ -129,7 +129,7 @@ class PDFDocumentHandler:
 
         self.pages_and_chunks = pages_and_chunks
         return pl.DataFrame(pages_and_chunks)
-
+    
     def __get_graph(self, text:str, nlp: LLMAPI):
         main_prompt = self.dict_prompt["graph_extraction_prompt"]
         formatted_prompt = main_prompt.format(json_formatting_prompt=self.dict_prompt["json_formatting_prompt"], example_1_prompt=self.dict_prompt["example_1_prompt"], example_2_prompt=self.dict_prompt["example_2_prompt"], text=text)
@@ -167,6 +167,17 @@ class PDFDocumentHandler:
         self.chunks_and_graphs = chunks_and_graphs
 
         return pl.DataFrame(chunks_and_graphs)
+
+    def save_graphs(self, path: str):
+        if self.chunks_and_graphs is None:
+            raise ValueError("No graphs to save. Please extract the graphs first.")
+        dir = os.path.dirname(path)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        df = pl.DataFrame(self.chunks_and_graphs)
+        df.write_json(path)
+        print(f"Graphs saved to {path}.")
+
 
 
 def find_similar_chunk_np(prompt_embedding: np.ndarray, pages_and_chunks, threshold=0.5):
@@ -222,3 +233,37 @@ class GraphDatabaseConnection:
     def clear_database(self):
         with self.get_session() as session:
             session.run("MATCH (n) DETACH DELETE n")
+
+class GraphDataLoader:
+    def __init__(self, db_connection: GraphDatabaseConnection):
+        self.db_connection = db_connection
+
+    def create_entity(self, entity_name, entity_type, entity_description):
+        with self.db_connection.get_session() as session:
+            session.write_transaction(self._create_entity, entity_name, entity_type, entity_description)
+
+    @staticmethod
+    def _create_entity(tx, entity_name, entity_type, entity_description):
+        query = (
+            "CREATE (e:Entity {name: $entity_name, type: $entity_type, description: $entity_description})"
+        )
+        tx.run(query, entity_name=entity_name, entity_type=entity_type, entity_description=entity_description)
+
+    def create_relationship(self, source_entity, target_entity, relationship_description, relationship_strength):
+        with self.db_connection.get_session() as session:
+            session.write_transaction(self._create_relationship, source_entity, target_entity, relationship_description, relationship_strength)
+
+    @staticmethod
+    def _create_relationship(tx, source_entity, target_entity, relationship_description, relationship_strength):
+        query = (
+            "MATCH (a:Entity {name: $source_entity}), (b:Entity {name: $target_entity}) "
+            "CREATE (a)-[r:RELATED_TO {description: $relationship_description, strength: $relationship_strength}]->(b)"
+        )
+        tx.run(query, source_entity=source_entity, target_entity=target_entity, relationship_description=relationship_description, relationship_strength=relationship_strength)
+
+    def load_data(self, data):
+        for entity in data['entities']:
+            self.create_entity(entity['entity_name'], entity['entity_type'], entity['entity_description'])
+        
+        for relationship in data['relationships']:
+            self.create_relationship(relationship['source_entity'], relationship['target_entity'], relationship['relationship_description'], relationship['relationship_strength'])
