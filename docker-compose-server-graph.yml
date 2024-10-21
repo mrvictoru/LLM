@@ -39,7 +39,7 @@ services:
   neo4j_db:
     image: neo4j:latest
     environment:
-      NEO4J_AUTH: none
+      NEO4J_AUTH: neo4j/password1
     ports:
       - "7474:7474"
       - "7687:7687"

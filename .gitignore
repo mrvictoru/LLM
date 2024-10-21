@@ -14,3 +14,9 @@ src/testinput
 
 # testoutput
 src/testoutput
+
+# extension ignore
+*.log
+*.tmp
+*.bak
+*.conf
