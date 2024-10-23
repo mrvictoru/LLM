@@ -237,6 +237,9 @@ class GraphDatabaseConnection:
 class GraphDataLoader:
     def __init__(self, db_connection: GraphDatabaseConnection):
         self.db_connection = db_connection
+        # check if the connection is valid
+        with self.db_connection.get_session() as session:
+            session.run("RETURN 1")
 
     def create_entity(self, entity_name, entity_type, entity_description):
         with self.db_connection.get_session() as session:
