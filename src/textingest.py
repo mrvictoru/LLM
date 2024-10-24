@@ -239,7 +239,11 @@ class GraphDataLoader:
         self.db_connection = db_connection
         # check if the connection is valid
         with self.db_connection.get_session() as session:
-            session.run("RETURN 1")
+            try:
+                result = session.run("RETURN 1")
+            except Exception as e:
+                print(e)
+                raise ValueError("Could not establish a connection to the database. Please check the connection details.")
 
     def create_entity(self, entity_name, entity_type, entity_description):
         with self.db_connection.get_session() as session:
@@ -248,7 +252,7 @@ class GraphDataLoader:
     @staticmethod
     def _create_entity(tx, entity_name, entity_type, entity_description):
         query = (
-            "CREATE (e:Entity {name: $entity_name, type: $entity_type, description: $entity_description})"
+            "MERGE (e:Entity {name: $entity_name, type: $entity_type, description: $entity_description})"
         )
         tx.run(query, entity_name=entity_name, entity_type=entity_type, entity_description=entity_description)
 
@@ -260,11 +264,11 @@ class GraphDataLoader:
     def _create_relationship(tx, source_entity, target_entity, relationship_description, relationship_strength):
         query = (
             "MATCH (a:Entity {name: $source_entity}), (b:Entity {name: $target_entity}) "
-            "CREATE (a)-[r:RELATED_TO {description: $relationship_description, strength: $relationship_strength}]->(b)"
+            "MERGE (a)-[r:RELATED_TO {description: $relationship_description, strength: $relationship_strength}]->(b)"
         )
         tx.run(query, source_entity=source_entity, target_entity=target_entity, relationship_description=relationship_description, relationship_strength=relationship_strength)
 
-    def load_data(self, data):
+    def load_graph_from_data(self, data: dict):
         for entity in data['entities']:
             self.create_entity(entity['entity_name'], entity['entity_type'], entity['entity_description'])
         
