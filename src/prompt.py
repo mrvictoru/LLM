@@ -197,3 +197,19 @@ Here is the text:{text}
 
 JSON OUPUT:
 """
+
+check_duplicate_entities_prompt = """
+Are the following two entities duplicates?
+
+Entity 1:
+Name: {entity1_name}
+Type: {entity1_type}
+Description: {entity1_description}
+
+Entity 2:
+Name: {entity2_name}
+Type: {entity2_type}
+Description: {entity2_description}
+
+Answer 'yes' or 'no' only.
+"""
