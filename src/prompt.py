@@ -213,3 +213,14 @@ Description: {entity2_description}
 
 Answer 'yes' or 'no' only.
 """
+
+summarize_descriptions_prompt = """
+Summarize the following two descriptions into one coherent description:
+
+Description 1: {description1}
+
+Description 2: {description2}
+
+Only provide the summary in the response.
+Summary:
+"""

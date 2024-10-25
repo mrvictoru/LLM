@@ -1,7 +1,7 @@
 import json
 from IPython.display import Image, display
 import requests
-from prompt import check_duplicate_entities_prompt
+from prompt import check_duplicate_entities_prompt, summarize_descriptions_prompt
 
 def get_api_key(selection: int) -> str:
     
@@ -73,9 +73,3 @@ def is_duplicate_llm(entity1, entity2, llm: LLMAPI):
                                                      entity2_description=entity2["entity_description"])
     response = llm.invoke(prompt)
     return response == 'yes'
-
-def normalize_text(text):
-    return text.strip().lower()
-
-def is_duplicate(entity1, entity2):
-    return normalize_text(entity1["entity_name"]) == normalize_text(entity2["entity_name"]) and entity1["entity_type"] == entity2["entity_type"]

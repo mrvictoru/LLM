@@ -9,7 +9,7 @@ import json
 import numpy as np
 import os
 
-from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt
+from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt, check_duplicate_entities_prompt, summarize_descriptions_prompt
 
 from neo4j import GraphDatabase
 
@@ -233,6 +233,52 @@ class GraphDatabaseConnection:
     def clear_database(self):
         with self.get_session() as session:
             session.run("MATCH (n) DETACH DELETE n")
+
+# the following helper function use llm api to summarize the two descriptions
+def summarize_descriptions_llm(description1, description2, llm: LLMAPI):
+    prompt = summarize_descriptions_prompt.format(description1=description1, description2=description2)
+    response = llm.invoke(prompt)
+    return response
+
+def normalize_text(text):
+    return text.strip().lower()
+
+def is_duplicate(entity1, entity2):
+    return normalize_text(entity1["entity_name"]) == normalize_text(entity2["entity_name"]) and entity1["entity_type"] == entity2["entity_type"]
+
+def resolve_entities(combined_dict, llm):
+    unique_entities = []
+    entity_map = {}  # Maps old entity names to new entity names
+
+    for entity in tqdm(combined_dict['entities'], desc="Resolving entities"):
+        found_duplicate = False
+        for unique_entity in unique_entities:
+            if is_duplicate(entity, unique_entity):
+                # Merge attributes if needed
+                found_duplicate = True
+                entity_map[entity['entity_name']] = unique_entity['entity_name']
+                # Summarize descriptions if they differ
+                if entity['entity_description'] != unique_entity['entity_description']:
+                    unique_entity['entity_description'] = summarize_descriptions_llm(
+                        unique_entity['entity_description'],
+                        entity['entity_description'],
+                        llm
+                    )
+                break
+        if not found_duplicate:
+            unique_entities.append(entity)
+            entity_map[entity['entity_name']] = entity['entity_name']
+
+
+    # Update relationships to point to resolved entities
+    for relationship in combined_dict['relationships']:
+        relationship['source_entity'] = entity_map.get(relationship['source_entity'], relationship['source_entity'])
+        relationship['target_entity'] = entity_map.get(relationship['target_entity'], relationship['target_entity'])
+
+    return {
+        'entities': unique_entities,
+        'relationships': combined_dict['relationships']
+    }, entity_map, unique_entities
 
 class GraphDataLoader:
     def __init__(self, db_connection: GraphDatabaseConnection):
