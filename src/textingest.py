@@ -178,7 +178,18 @@ class PDFDocumentHandler:
         df.write_json(path)
         print(f"Graphs saved to {path}.")
 
+def calculate_cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray):
+    """
+    Calculate the cosine similarity between two embeddings.
 
+    Parameters:
+        embedding1 (np.ndarray): The first embedding.
+        embedding2 (np.ndarray): The second embedding.
+
+    Returns:
+        float: The cosine similarity between the two embeddings.
+    """
+    return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
 
 def find_similar_chunk_np(prompt_embedding: np.ndarray, pages_and_chunks, threshold=0.5):
     """
@@ -246,6 +257,23 @@ def normalize_text(text):
 def is_duplicate(entity1, entity2):
     return normalize_text(entity1["entity_name"]) == normalize_text(entity2["entity_name"]) and entity1["entity_type"] == entity2["entity_type"]
 
+# the following helper function use llm api to check if the entities are duplicate
+def is_duplicate_llm(entity1, entity2, llm: LLMAPI):
+    prompt = check_duplicate_entities_prompt.format(entity1_name=entity1["entity_name"], 
+                                                     entity1_type=entity1["entity_type"], 
+                                                     entity1_description=entity1["entity_description"],
+                                                     entity2_name=entity2["entity_name"], 
+                                                     entity2_type=entity2["entity_type"], 
+                                                     entity2_description=entity2["entity_description"])
+    response = llm.invoke(prompt)
+    return response == 'yes'
+
+def is_duplicate_emb(entity1, entity2, embedding: LLMAPI, threshold=0.8):
+    embedding1 = np.array(embedding.embedding_text(entity1["entity_description"]))
+    embedding2 = np.array(embedding.embedding_text(entity2["entity_description"]))
+    similarity = calculate_cosine_similarity(embedding1, embedding2)
+    return similarity > threshold or is_duplicate(entity1, entity2)
+
 def resolve_entities(combined_dict, llm):
     unique_entities = []
     entity_map = {}  # Maps old entity names to new entity names
@@ -279,6 +307,76 @@ def resolve_entities(combined_dict, llm):
         'entities': unique_entities,
         'relationships': combined_dict['relationships']
     }, entity_map, unique_entities
+
+# this function is used to resolve the entities by using llm to check whether the entities are duplicate
+def resolve_entities_v2(combined_dict, llm, llm_2):
+    unique_entities = []
+    entity_map = {}  # Maps old entity names to new entity names
+
+    for entity in tqdm(combined_dict['entities'], desc="Resolving entities"):
+        found_duplicate = False
+        for unique_entity in unique_entities:
+            if is_duplicate_llm(entity, unique_entity, llm_2):
+                # Merge attributes if needed
+                found_duplicate = True
+                entity_map[entity['entity_name']] = unique_entity['entity_name']
+                # Summarize descriptions if they differ
+                if entity['entity_description'] != unique_entity['entity_description']:
+                    unique_entity['entity_description'] = summarize_descriptions_llm(
+                        unique_entity['entity_description'],
+                        entity['entity_description'],
+                        llm
+                    )
+                break
+        if not found_duplicate:
+            unique_entities.append(entity)
+            entity_map[entity['entity_name']] = entity['entity_name']
+
+
+    # Update relationships to point to resolved entities
+    for relationship in combined_dict['relationships']:
+        relationship['source_entity'] = entity_map.get(relationship['source_entity'], relationship['source_entity'])
+        relationship['target_entity'] = entity_map.get(relationship['target_entity'], relationship['target_entity'])
+
+    return {
+        'entities': unique_entities,
+        'relationships': combined_dict['relationships']
+    }, entity_map, unique_entities
+
+# this function is used to resolve the entities by using embedding similarity to check whether the entities are duplicate
+def resolve_entities_v3(combined_dict, llm):
+    unique_entities = []
+    entity_map = {}  # Maps old entity names to new entity names
+
+    for entity in tqdm(combined_dict['entities'], desc="Resolving entities"):
+        found_duplicate = False
+        for unique_entity in unique_entities:
+            if is_duplicate_emb(entity, unique_entity):
+                # Merge attributes if needed
+                found_duplicate = True
+                entity_map[entity['entity_name']] = unique_entity['entity_name']
+                # Summarize descriptions if they differ
+                if entity['entity_description'] != unique_entity['entity_description']:
+                    unique_entity['entity_description'] = summarize_descriptions_llm(
+                        unique_entity['entity_description'],
+                        entity['entity_description'],
+                        llm
+                    )
+                break
+        if not found_duplicate:
+            unique_entities.append(entity)
+            entity_map[entity['entity_name']] = entity['entity_name']
+
+    # Update relationships to point to resolved entities
+    for relationship in combined_dict['relationships']:
+        relationship['source_entity'] = entity_map.get(relationship['source_entity'], relationship['source_entity'])
+        relationship['target_entity'] = entity_map.get(relationship['target_entity'], relationship['target_entity'])
+
+    return {
+        'entities': unique_entities,
+        'relationships': combined_dict['relationships']
+    }, entity_map, unique_entities
+
 
 class GraphDataLoader:
     def __init__(self, db_connection: GraphDatabaseConnection):

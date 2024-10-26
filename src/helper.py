@@ -63,13 +63,4 @@ class LLMAPI:
         api_data = response.json()
         return api_data["content"]
     
-# the following helper function use llm api to check if the entities are duplicate
-def is_duplicate_llm(entity1, entity2, llm: LLMAPI):
-    prompt = check_duplicate_entities_prompt.format(entity1_name=entity1["entity_name"], 
-                                                     entity1_type=entity1["entity_type"], 
-                                                     entity1_description=entity1["entity_description"],
-                                                     entity2_name=entity2["entity_name"], 
-                                                     entity2_type=entity2["entity_type"], 
-                                                     entity2_description=entity2["entity_description"])
-    response = llm.invoke(prompt)
-    return response == 'yes'
+

@@ -8,10 +8,32 @@ services:
       "-c", "4096",
       "--host", "0.0.0.0",
       "--port", "8080",
-      "--n-gpu-layers", "100"
+      "--n-gpu-layers", "200"
     ]
     ports:
       - "8080:8080"
+    volumes:
+      - "./models:/models"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+              
+  llama_server_2:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    command: [
+      "-m", "./models/Phi-3.1-mini-4k-instruct-Q6_K_L.gguf",
+      "-t", "20",
+      "-c", "4096",
+      "--host", "0.0.0.0",
+      "--port", "8081",
+      "--n-gpu-layers", "200"
+    ]
+    ports:
+      - "8081:8081"
     volumes:
       - "./models:/models"
     deploy:
