@@ -351,7 +351,7 @@ def resolve_entities_v3(combined_dict, llm):
     for entity in tqdm(combined_dict['entities'], desc="Resolving entities"):
         found_duplicate = False
         for unique_entity in unique_entities:
-            if is_duplicate_emb(entity, unique_entity):
+            if is_duplicate_emb(entity, unique_entity, llm):
                 # Merge attributes if needed
                 found_duplicate = True
                 entity_map[entity['entity_name']] = unique_entity['entity_name']
