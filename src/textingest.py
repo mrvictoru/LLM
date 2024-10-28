@@ -378,7 +378,7 @@ def resolve_entities_v3(combined_dict, llm):
     }, entity_map, unique_entities
 
 
-class GraphDataLoader:
+class GraphDataManager:
     def __init__(self, db_connection: GraphDatabaseConnection):
         self.db_connection = db_connection
         # check if the connection is valid
@@ -418,3 +418,38 @@ class GraphDataLoader:
         
         for relationship in data['relationships']:
             self.create_relationship(relationship['source_entity'], relationship['target_entity'], relationship['relationship_description'], relationship['relationship_strength'])
+
+    def drop_existing_graph(self, graph_name="entitygraph"):
+        """
+        Drops an existing graph from the database if it exists.
+
+        Args:
+            graph_name (str): The name of the graph to be dropped. Defaults to "entitygraph".
+
+        Returns:
+            None
+
+        Raises:
+            Any exceptions raised by the database session or query execution.
+
+        Note:
+            This method uses the Graph Data Science (GDS) library to check for the existence of the graph
+            and to drop it if it exists.
+        """
+        with self.db_connection.get_session() as session:
+            drop_query = f"CALL gds.graph.exists('{graph_name}') YIELD exists"
+            result = session.run(drop_query).single()["exists"]
+            if result:
+                drop_query = f"CALL gds.graph.drop('{graph_name}') YIELD graphName"
+                session.run(drop_query)
+
+    def verify_relationship_weights(self):
+        with self.db_connection.get_session() as session:
+            query = "MATCH ()-[r:RELATED_TO]->() WHERE r.strength IS NULL RETURN r LIMIT 5"
+            missing_weights = session.run(query).data()
+            if missing_weights:
+                print("Warning: Some relationships do not have strengths assigned:", missing_weights)
+    
+    def reproject_graph(self, graph_name="entitygraph"):
+        self.drop_existing_graph(graph_name)
+        self.verify_relationship_weights()
