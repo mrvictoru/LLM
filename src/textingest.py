@@ -449,7 +449,4 @@ class GraphDataManager:
             missing_weights = session.run(query).data()
             if missing_weights:
                 print("Warning: Some relationships do not have strengths assigned:", missing_weights)
-    
-    def reproject_graph(self, graph_name="entitygraph"):
-        self.drop_existing_graph(graph_name)
-        self.verify_relationship_weights()
+
