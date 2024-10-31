@@ -11,7 +11,7 @@ import os
 
 from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt, check_duplicate_entities_prompt, summarize_descriptions_prompt
 
-from neo4j import GraphDatabase
+import networkx as nx
 
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10, lang=English()):
@@ -228,22 +228,6 @@ def find_similar_chunk_np(prompt_embedding: np.ndarray, pages_and_chunks, thresh
 
     return sorted_df.select(["page", "sentence_chunk", "cosine_similarity"])
 
-class GraphDatabaseConnection:
-    def __init__(self, uri, user, password):
-        if not uri or not user or not password:
-            raise ValueError(
-                "URI, user, and password must be provided to initialize the DatabaseConnection.")
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
-
-    def close(self):
-        self.driver.close()
-
-    def get_session(self):
-        return self.driver.session()
-
-    def clear_database(self):
-        with self.get_session() as session:
-            session.run("MATCH (n) DETACH DELETE n")
 
 # the following helper function use llm api to summarize the two descriptions
 def summarize_descriptions_llm(description1, description2, llm: LLMAPI):
@@ -379,74 +363,33 @@ def resolve_entities_v3(combined_dict, llm):
 
 
 class GraphDataManager:
-    def __init__(self, db_connection: GraphDatabaseConnection):
-        self.db_connection = db_connection
-        # check if the connection is valid
-        with self.db_connection.get_session() as session:
-            try:
-                result = session.run("RETURN 1")
-            except Exception as e:
-                print(e)
-                raise ValueError("Could not establish a connection to the database. Please check the connection details.")
+    def __init__(self):
+        self.graph = nx.Graph()
 
     def create_entity(self, entity_name, entity_type, entity_description):
-        with self.db_connection.get_session() as session:
-            session.write_transaction(self._create_entity, entity_name, entity_type, entity_description)
-
-    @staticmethod
-    def _create_entity(tx, entity_name, entity_type, entity_description):
-        query = (
-            "MERGE (e:Entity {name: $entity_name, type: $entity_type, description: $entity_description})"
-        )
-        tx.run(query, entity_name=entity_name, entity_type=entity_type, entity_description=entity_description)
+        self.graph.add_node(entity_name, type=entity_type, description=entity_description)
 
     def create_relationship(self, source_entity, target_entity, relationship_description, relationship_strength):
-        with self.db_connection.get_session() as session:
-            session.write_transaction(self._create_relationship, source_entity, target_entity, relationship_description, relationship_strength)
-
-    @staticmethod
-    def _create_relationship(tx, source_entity, target_entity, relationship_description, relationship_strength):
-        query = (
-            "MATCH (a:Entity {name: $source_entity}), (b:Entity {name: $target_entity}) "
-            "MERGE (a)-[r:RELATED_TO {description: $relationship_description, strength: $relationship_strength}]->(b)"
-        )
-        tx.run(query, source_entity=source_entity, target_entity=target_entity, relationship_description=relationship_description, relationship_strength=relationship_strength)
+        self.graph.add_edge(source_entity, target_entity, description=relationship_description, strength=relationship_strength)
 
     def load_graph_from_data(self, data: dict):
         for entity in data['entities']:
             self.create_entity(entity['entity_name'], entity['entity_type'], entity['entity_description'])
-        
         for relationship in data['relationships']:
-            self.create_relationship(relationship['source_entity'], relationship['target_entity'], relationship['relationship_description'], relationship['relationship_strength'])
+            self.create_relationship(
+                relationship['source_entity'],
+                relationship['target_entity'],
+                relationship['relationship_description'],
+                relationship['relationship_strength']
+            )
 
-    def drop_existing_graph(self, graph_name="entitygraph"):
-        """
-        Drops an existing graph from the database if it exists.
-
-        Args:
-            graph_name (str): The name of the graph to be dropped. Defaults to "entitygraph".
-
-        Returns:
-            None
-
-        Raises:
-            Any exceptions raised by the database session or query execution.
-
-        Note:
-            This method uses the Graph Data Science (GDS) library to check for the existence of the graph
-            and to drop it if it exists.
-        """
-        with self.db_connection.get_session() as session:
-            drop_query = f"CALL gds.graph.exists('{graph_name}') YIELD exists"
-            result = session.run(drop_query).single()["exists"]
-            if result:
-                drop_query = f"CALL gds.graph.drop('{graph_name}') YIELD graphName"
-                session.run(drop_query)
+    def drop_existing_graph(self):
+        self.graph.clear()
 
     def verify_relationship_weights(self):
-        with self.db_connection.get_session() as session:
-            query = "MATCH ()-[r:RELATED_TO]->() WHERE r.strength IS NULL RETURN r LIMIT 5"
-            missing_weights = session.run(query).data()
-            if missing_weights:
-                print("Warning: Some relationships do not have strengths assigned:", missing_weights)
+        missing_weights = [
+            (u, v) for u, v, d in self.graph.edges(data=True) if 'strength' not in d
+        ]
+        if missing_weights:
+            print("Warning: Some relationships do not have strengths assigned:", missing_weights)
 
