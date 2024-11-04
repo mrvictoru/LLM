@@ -21,7 +21,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-              
+
   llama_server_2:
     image: ghcr.io/ggerganov/llama.cpp:server-cuda
     command: [
@@ -34,6 +34,29 @@ services:
     ]
     ports:
       - "8081:8081"
+    volumes:
+      - "./models:/models"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  embedding_server:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    command: [
+      "-m", "./models/all-MiniLM-L6-v2-Q5_K_M.gguf",
+      "-t", "20",
+      "-c", "4096",
+      "--host", "0.0.0.0",
+      "--port", "8082",
+      "--n-gpu-layers", "200",
+      "--embedding"
+    ]
+    ports:
+      - "8082:8082"
     volumes:
       - "./models:/models"
     deploy:

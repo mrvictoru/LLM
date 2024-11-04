@@ -11,3 +11,4 @@ wheel
 nltk
 networkx
 python-louvain
+plotly

@@ -46,10 +46,10 @@ class LLMAPI:
     # this function is used to call the embedding endpoint of the LLM
     def embedding_text(self, text: str):
         url = self.url + '/embedding'
-        data = {"content": text}
+        data = {"input": text, "thread": 5}
         response = requests.post(url, json=data)
         api_data = response.json()
-        return api_data["embedding"]
+        return api_data['data'][0]["embedding"]
 
     # this function is used to call the completion endpoint of the LLM, not suitable for chat format
     def invoke(self, text: str, max_tokens: int = 1042, temperature: float = 0.2):

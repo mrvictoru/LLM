@@ -1,7 +1,7 @@
 import fitz
 from tqdm.auto import tqdm
 import nltk
-nltk.download('punkt')
+nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
 from helper import LLMAPI
 
@@ -14,6 +14,8 @@ import os
 from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt, check_duplicate_entities_prompt, summarize_descriptions_prompt
 
 import networkx as nx
+import community as community_louvain
+import plotly.graph_objects as go
 
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10):
@@ -391,4 +393,89 @@ class GraphDataManager:
         ]
         if missing_weights:
             print("Warning: Some relationships do not have strengths assigned:", missing_weights)
+    
+    def detect_communities(self):
+        # Use the Louvain method to detect communities
+        partition = community_louvain.best_partition(self.graph)
+        # Assign communityID to each node
+        for node, community_id in partition.items():
+            self.graph.nodes[node]['communityID'] = community_id
+        return partition
 
+    def render_graph(self):
+        pos = nx.spring_layout(self.graph)  # positions for all nodes
+
+        # Extract node and edge information
+        edge_x = []
+        edge_y = []
+        edge_text = []
+        for edge in self.graph.edges(data=True):
+            x0, y0 = pos[edge[0]]
+            x1, y1 = pos[edge[1]]
+            edge_x.append(x0)
+            edge_x.append(x1)
+            edge_x.append(None)
+            edge_y.append(y0)
+            edge_y.append(y1)
+            edge_y.append(None)
+            edge_text.append(f"Source: {edge[0]}<br>Target: {edge[1]}<br>Description: {edge[2].get('description', 'N/A')}<br>Strength: {edge[2].get('strength', 'N/A')}")
+
+        edge_trace = go.Scatter(
+            x=edge_x, y=edge_y,
+            line=dict(width=0.5, color='#888'),
+            hoverinfo='text',
+            text=edge_text,
+            mode='lines')
+
+        node_x = []
+        node_y = []
+        for node in self.graph.nodes():
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+
+        node_trace = go.Scatter(
+            x=node_x, y=node_y,
+            mode='markers',
+            hoverinfo='text',
+            marker=dict(
+                showscale=True,
+                colorscale='Rainbow',
+                size=10,
+                color=[],
+                colorbar=dict(
+                    thickness=15,
+                    title='Community ID',
+                    xanchor='left',
+                    titleside='right'
+                ),
+            )
+        )
+
+        # Add node attributes
+        node_text = []
+        node_color = []
+        communities = nx.get_node_attributes(self.graph, 'communityID')
+        for node in self.graph.nodes():
+            node_text.append(f'{node}<br>Community: {communities.get(node, 0)}')
+            node_color.append(communities.get(node, 0))
+
+        node_trace.text = node_text
+        node_trace.marker.color = node_color
+
+        fig = go.Figure(data=[edge_trace, node_trace],
+                        layout=go.Layout(
+                            title='Graph Visualization with Communities',
+                            titlefont_size=16,
+                            showlegend=False,
+                            hovermode='closest',
+                            margin=dict(b=20, l=5, r=5, t=40),
+                            annotations=[dict(
+                                text="Graph Visualization",
+                                showarrow=False,
+                                xref="paper", yref="paper",
+                                x=0.005, y=-0.002)],
+                            xaxis=dict(showgrid=False, zeroline=False),
+                            yaxis=dict(showgrid=False, zeroline=False))
+                        )
+        fig.show()
