@@ -44,7 +44,7 @@ services:
               count: all
               capabilities: [gpu]
   
-  python_dev_standalone:
+  python_dev_graph:
     build:
       context: .
       dockerfile: LLM_graph_setup/Dockerfile
@@ -57,21 +57,8 @@ services:
     environment:
       - OPENAI_API_BASE="http://llama_server:8080"
       - OPENAI_API_KEY=no_key
-  
-  neo4j_db:
-    image: neo4j:latest
-    environment:
-      NEO4J_AUTH: neo4j/password1
-      NEO4J_dbms_security_procedures_unrestricted: "gds.*"
-      NEO4J_PLUGINS: '["graph-data-science"]'
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    volumes:
-      - neo4j_data:/data
 
 
 volumes:
   models:
   code:
-  neo4j_data:

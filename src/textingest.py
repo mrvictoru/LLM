@@ -1,6 +1,8 @@
 import fitz
 from tqdm.auto import tqdm
-from spacy.lang.en import English
+import nltk
+nltk.download('punkt')
+from nltk.tokenize import sent_tokenize
 from helper import LLMAPI
 
 import re
@@ -14,10 +16,9 @@ from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_pr
 import networkx as nx
 
 class PDFDocumentHandler:
-    def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10, lang=English()):
+    def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10):
         self.pdf_path = pdf_path
         self.chunk_size = chunk_size
-        self.lang = lang
 
         if dict_prompt is None:
             dict_prompt = {
@@ -68,18 +69,16 @@ class PDFDocumentHandler:
             self.open_pdf()
 
         pdf_content = []
-        # add sentencizer to the language object
-        self.lang.add_pipe("sentencizer")
+
         # loop through the pdf page using enumerate
         print("Loading PDF document...")
         for iter_page in tqdm(enumerate(self.pdf_document), total=len(self.pdf_document), desc="Reading PDF"):
             page_num = iter_page[0]
             text = iter_page[1].get_text()
             clean_text = text.replace("\n", " ").strip()
-            # get the sentences from the text using sentencizer
-            sentencizer = self.lang(clean_text).sents
-            # loop through the sentences and store them in a list
-            sentences = [str(sent.text) for sent in sentencizer]
+
+            # Get the sentences from the text using NLTK
+            sentences = sent_tokenize(clean_text)
             sentence_count = len(sentences)
             # chunk the sentences into groups of 10
             chunked_sentences = self.__chunk_sentences(sentences)
