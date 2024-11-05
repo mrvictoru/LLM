@@ -479,3 +479,5 @@ class GraphDataManager:
                             yaxis=dict(showgrid=False, zeroline=False))
                         )
         fig.show()
+
+    #TODO: Implement Node2Vec and Community report generation and summarization.
