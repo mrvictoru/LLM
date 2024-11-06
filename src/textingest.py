@@ -17,6 +17,8 @@ import networkx as nx
 import community as community_louvain
 import plotly.graph_objects as go
 
+import node2vec
+
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10):
         self.pdf_path = pdf_path
@@ -481,3 +483,11 @@ class GraphDataManager:
         fig.show()
 
     #TODO: Implement Node2Vec and Community report generation and summarization.
+    def community_report_gen(self):
+        # loop through each community
+        # for each community, get the nodes and edges
+        # create a subgraph
+        # use llm to summarize the subgraph
+        # store the summary in a dictionary with community id as key
+        
+        
