@@ -11,7 +11,7 @@ import json
 import numpy as np
 import os
 
-from prompt import graph_extraction_prompt, json_formatting_prompt, example_1_prompt, example_2_prompt, check_duplicate_entities_prompt, summarize_descriptions_prompt
+from prompt import graph_extraction_prompt, extraction_json_formatting_prompt, extraction_example_1_prompt, extraction_example_2_prompt, check_duplicate_entities_prompt, summarize_descriptions_prompt, community_report_generation_prompt, community_report_format_prompt, community_report_example_prompt
 
 import networkx as nx
 import community as community_louvain
@@ -27,9 +27,9 @@ class PDFDocumentHandler:
         if dict_prompt is None:
             dict_prompt = {
                 "graph_extraction_prompt": graph_extraction_prompt,
-                "json_formatting_prompt": json_formatting_prompt,
-                "example_1_prompt": example_1_prompt,
-                "example_2_prompt": example_2_prompt,
+                "json_formatting_prompt": extraction_json_formatting_prompt,
+                "example_1_prompt": extraction_example_1_prompt,
+                "example_2_prompt": extraction_example_2_prompt,
             }
         self.dict_prompt = dict_prompt
         self.pdf_document = None
@@ -366,8 +366,16 @@ def resolve_entities_v3(combined_dict, llm):
 
 
 class GraphDataManager:
-    def __init__(self):
+    def __init__(self, dict_prompt: dict = None):
         self.graph = nx.Graph()
+        self.community_summaries ={}
+        if dict_prompt is None:
+            dict_prompt = {
+                "community_report_generation_prompt": community_report_generation_prompt,
+                "community_report_format_prompt": community_report_format_prompt,
+                "community_report_example_prompt": community_report_example_prompt,
+            }
+        self.dict_prompt = dict_prompt
 
     def create_entity(self, entity_name, entity_type, entity_description):
         self.graph.add_node(entity_name, type=entity_type, description=entity_description)
@@ -483,11 +491,50 @@ class GraphDataManager:
         fig.show()
 
     #TODO: Implement Node2Vec and Community report generation and summarization.
-    def community_report_gen(self):
+    def community_report_gen(self, llm:LLMAPI):
         # loop through each community
         # for each community, get the nodes and edges
         # create a subgraph
         # use llm to summarize the subgraph
         # store the summary in a dictionary with community id as key
-        
-        
+
+        # Get the community IDs
+        communities = nx.get_node_attributes(self.graph, 'communityID')
+
+        # Group nodes by community
+        community_nodes = {}
+        for node, community_id in communities.items():
+            if community_id not in community_nodes:
+                community_nodes[community_id] = []
+            community_nodes[community_id].append(node)
+
+        # Loop through each community
+        for community_id, nodes in community_nodes.items():
+            # Create a subgraph for the community
+            subgraph = self.graph.subgraph(nodes)
+
+            # Generate a summary of the subgraph using LLM
+            summary = self.summarize_subgraph(subgraph, llm)
+
+            # Store the summary in the dictionary
+            self.community_summaries[community_id] = summary
+
+        return self.community_summaries
+    
+    def summarize_subgraph(self, subgraph, llm):
+        # Convert subgraph to the specified string format
+        node_lines = ["id,entity,description"]
+        for i, (node, data) in enumerate(subgraph.nodes(data=True), start=1):
+            node_lines.append(f"{i},{node},{data.get('description', 'N/A')}")
+
+        edge_lines = ["id,source,target,description"]
+        for i, (u, v, data) in enumerate(subgraph.edges(data=True), start=1):
+            edge_lines.append(f"{i},{u},{v},{data.get('description', 'N/A')}")
+
+        subgraph_str = "Entities\n".join(node_lines) + "\n\nRelationships\n\n" + "\n".join(edge_lines)
+
+        main_prompt = self.dict_prompt["community_report_generation_prompt"]
+        formatted_prompt = main_prompt.format(community_report_format_prompt=self.dict_prompt["community_report_format_prompt"], community_report_example_prompt=self.dict_prompt["community_report_example_prompt"], input_text=subgraph_str)
+        output = llm.invoke(formatted_prompt)
+
+        return output
