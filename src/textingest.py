@@ -17,7 +17,7 @@ import networkx as nx
 import community as community_louvain
 import plotly.graph_objects as go
 
-import node2vec
+#import node2vec
 
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10):
@@ -428,6 +428,7 @@ class GraphDataManager:
             edge_y.append(y0)
             edge_y.append(y1)
             edge_y.append(None)
+            # TODO this doesn show up in the hover text, try fixing it.
             edge_text.append(f"Source: {edge[0]}<br>Target: {edge[1]}<br>Description: {edge[2].get('description', 'N/A')}<br>Strength: {edge[2].get('strength', 'N/A')}")
 
         edge_trace = go.Scatter(
@@ -462,12 +463,12 @@ class GraphDataManager:
             )
         )
 
-        # Add node attributes
         node_text = []
         node_color = []
         communities = nx.get_node_attributes(self.graph, 'communityID')
         for node in self.graph.nodes():
-            node_text.append(f'{node}<br>Community: {communities.get(node, 0)}')
+            description = self.graph.nodes[node].get('description', 'N/A')
+            node_text.append(f'{node}<br>Description: {description}<br>Community: {communities.get(node, 0)}')
             node_color.append(communities.get(node, 0))
 
         node_trace.text = node_text
@@ -490,7 +491,7 @@ class GraphDataManager:
                         )
         fig.show()
 
-    #TODO: Implement Node2Vec and Community report generation and summarization.
+    #TODO: community report gen return empty summary, investigate and debug
     def community_report_gen(self, llm:LLMAPI):
         # loop through each community
         # for each community, get the nodes and edges
@@ -509,7 +510,7 @@ class GraphDataManager:
             community_nodes[community_id].append(node)
 
         # Loop through each community
-        for community_id, nodes in community_nodes.items():
+        for community_id, nodes in tqdm(community_nodes.items(), desc="Generating community reports"):
             # Create a subgraph for the community
             subgraph = self.graph.subgraph(nodes)
 
