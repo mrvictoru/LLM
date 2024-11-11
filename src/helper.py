@@ -52,7 +52,7 @@ class LLMAPI:
         return api_data['data'][0]["embedding"]
 
     # this function is used to call the completion endpoint of the LLM, not suitable for chat format
-    def invoke(self, text: str, max_tokens: int = 1042, temperature: float = 0.2):
+    def invoke(self, text: str, max_tokens: int = 4096, temperature: float = 0.2):
         url = self.url + "/completion"
         data = {
             "prompt":text,
