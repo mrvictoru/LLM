@@ -412,14 +412,16 @@ class GraphDataManager:
             self.graph.nodes[node]['communityID'] = community_id
         return partition
 
-    def render_graph(self):
-        pos = nx.spring_layout(self.graph)  # positions for all nodes
+    def render_graph(self, graph=None):
+        if graph is None:
+            graph = self.graph
+        pos = nx.spring_layout(graph)  # positions for all nodes
 
         # Extract node and edge information
         edge_x = []
         edge_y = []
         edge_text = []
-        for edge in self.graph.edges(data=True):
+        for edge in graph.edges(data=True):
             x0, y0 = pos[edge[0]]
             x1, y1 = pos[edge[1]]
             edge_x.append(x0)
@@ -440,7 +442,7 @@ class GraphDataManager:
 
         node_x = []
         node_y = []
-        for node in self.graph.nodes():
+        for node in graph.nodes():
             x, y = pos[node]
             node_x.append(x)
             node_y.append(y)
@@ -465,9 +467,9 @@ class GraphDataManager:
 
         node_text = []
         node_color = []
-        communities = nx.get_node_attributes(self.graph, 'communityID')
-        for node in self.graph.nodes():
-            description = self.graph.nodes[node].get('description', 'N/A')
+        communities = nx.get_node_attributes(graph, 'communityID')
+        for node in graph.nodes():
+            description = graph.nodes[node].get('description', 'N/A')
             node_text.append(f'{node}<br>Description: {description}<br>Community: {communities.get(node, 0)}')
             node_color.append(communities.get(node, 0))
 
