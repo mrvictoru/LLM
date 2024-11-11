@@ -518,9 +518,10 @@ class GraphDataManager:
 
             # Generate a summary of the subgraph using LLM
             summary = self.summarize_subgraph(subgraph, llm)
+            summary_dict = json.loads(summary)
 
-            # Store the summary in the dictionary
-            self.community_summaries[community_id] = summary
+            # Store the summary dictionary in the dictionary
+            self.community_summaries[community_id] = summary_dict
 
         return self.community_summaries
     
