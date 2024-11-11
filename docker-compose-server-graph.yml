@@ -3,7 +3,7 @@ services:
   llama_server:
     image: ghcr.io/ggerganov/llama.cpp:server-cuda
     command: [
-      "-m", "./models/Mistral-Nemo-Instruct-2407.Q6_K.gguf",
+      "-m", "./models/Mistral-Nemo-Instruct-2407-Q6_K.gguf",
       "-t", "20",
       "-c", "8000",
       "--host", "0.0.0.0",
