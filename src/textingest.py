@@ -518,10 +518,16 @@ class GraphDataManager:
 
             # Generate a summary of the subgraph using LLM
             summary = self.summarize_subgraph(subgraph, llm)
-            summary_dict = json.loads(summary)
+            try:
+                summary_dict = json.loads(summary)
 
-            # Store the summary dictionary in the dictionary
-            self.community_summaries[community_id] = summary_dict
+                # Store the summary dictionary in the dictionary
+                self.community_summaries[community_id] = summary_dict
+            except Exception as e:
+                print(f"Error parsing JSON for community {community_id}: {e}")
+
+                # Store the raw summary in the dictionary
+                self.community_summaries[community_id] = summary
 
         return self.community_summaries
     
