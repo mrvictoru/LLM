@@ -17,6 +17,11 @@ import networkx as nx
 import community as community_louvain
 import plotly.graph_objects as go
 
+import logging
+# configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 #import node2vec
 
 class PDFDocumentHandler:
@@ -494,12 +499,14 @@ class GraphDataManager:
         fig.show()
 
     #TODO: community report gen return empty summary, investigate and debug
-    def community_report_gen(self, llm:LLMAPI):
-        # loop through each community
-        # for each community, get the nodes and edges
-        # create a subgraph
-        # use llm to summarize the subgraph
-        # store the summary in a dictionary with community id as key
+    def community_report_gen(self, llm:LLMAPI, max_retries:int=3):
+        """
+        Generates reports for each community using an LLM.
+
+        :param llm: An instance of LLMAPI or similar class with an `invoke` method.
+        :param max_retries: Maximum number of retries for correcting JSON summaries.
+        :return: Dictionary with community IDs as keys and their summaries as values.
+        """
 
         # Get the community IDs
         communities = nx.get_node_attributes(self.graph, 'communityID')
@@ -517,35 +524,20 @@ class GraphDataManager:
             subgraph = self.graph.subgraph(nodes)
 
             # Generate a summary of the subgraph using LLM
-            summary = self.summarize_subgraph(subgraph, llm)
+            summary = self.summarize_subgraph(subgraph, llm, max_retries)
 
-            if summary != 'timeout':
+            if summary == 'timeout':
+                logger.error(f"LLM invocation timed out for community {community_id}. Skipping.")
+                self.community_summaries[community_id] = {"error": "Summary unavailable due to timeout."}
+                continue
                 # check if the summary can be extract as json from string
-                try:
-                    json_summary = json.loads(summary)
-                    print(f"JSON parsed successfully for community {community_id}.")
-                except Exception as e:
-                    print(f"Error: {e}")
-                    print(f"Error parsing JSON for community {community_id}, correcting with LLM.")
-                    # if not, pass it to an llm and have them to correct it
-                    prompt = f"The following text could not be extracted as JSON. Please correct or remove text from the following string format so it can be extract as json while retaining appropiate information:\n{summary}\nOutput only correct JSON format:\n"
-                    input_prompt = prompt.format(summary=summary)
-                    json_summary = llm.invoke(input_prompt)
 
-                self.community_summaries[community_id] = {
-                    "original_summary": summary,
-                    "json_summary": json_summary
-                }
-            else:
-                print(f"Timeout error for community {community_id}.")
-                self.community_summaries[community_id] = {
-                    "original_summary": summary,
-                    "json_summary": None
-                }
+            json_summary = self.parse_summary_json(summary, community_id, llm, max_retries)
+            self.community_summaries[community_id] = json_summary
 
         return self.community_summaries
     
-    def summarize_subgraph(self, subgraph, llm):
+    def summarize_subgraph(self, subgraph, llm, retries):
         # Convert subgraph to the specified string format
         node_lines = ["id,entity,description"]
         for i, (node, data) in enumerate(subgraph.nodes(data=True), start=1):
@@ -560,14 +552,74 @@ class GraphDataManager:
         main_prompt = self.dict_prompt["community_report_generation_prompt"]
         formatted_prompt = main_prompt.format(community_report_format_prompt=self.dict_prompt["community_report_format_prompt"], community_report_example_prompt=self.dict_prompt["community_report_example_prompt"], input_text=subgraph_str)
         
-        for attempt in range(3):
+        for attempt in range(retries):
             try:
                 output = llm.invoke(formatted_prompt)
-                break
+                return output
             except TimeoutError:
-                if attempt < 2:
+                if attempt < retries-1:
                     continue
                 else:
-                    output = 'timeout'
+                    logger.error("LLM invocation timed out.")
+                    return 'timeout'
+            except Exception as e:
+                logger.error(f"An error occurred with using llm to summarize subgraph: {e}")
+                return 'timeout'
 
-        return output
+    
+    def parse_summary_json(self, summary, community_id, llm, max_retries):
+        """
+        Attempts to parse summary as JSON. If it fails, uses LLM to correct it.
+
+        :param summary: Summary string from LLM.
+        :param community_id: ID of the community being processed.
+        :param llm: LLMAPI instance.
+        :param max_retries: Maximum number of retries for correction.
+        :return: Parsed JSON summary or an error message.
+        """
+        for attempt in range(1, max_retries + 1):
+            try:
+                json_summary = json.loads(summary)
+                logger.info(f"JSON parsed successfully for community {community_id}.")
+                return json_summary
+            except json.JSONDecodeError as e:
+                logger.warning(f"Attempt {attempt}: JSON parsing failed for community {community_id}: {e}")
+                if attempt < max_retries:
+                    logger.info(f"Attempting to correct JSON for community {community_id} using LLM.")
+                    summary = self.correct_summary_with_llm(summary, llm)
+                else:
+                    logger.error(f"All attempts failed to parse JSON for community {community_id}.")
+                    return {"error": "Summary unavailable due to parsing issues."}
+            except Exception as e:
+                logger.warning(f"Attempt {attempt}: Unknown error occurred for community {community_id}: {e}")
+                if attempt < max_retries:
+                    logger.info(f"Attempting to correct JSON for community {community_id} using LLM.")
+                    summary = self.correct_summary_with_llm(summary, llm)
+                else:
+                    logger.error(f"All attempts failed to parse JSON for community {community_id}.")
+                    
+        return {"error": "Summary unavailable due to unknown issues."}
+
+    def correct_summary_with_llm(self, summary, llm):
+        """
+        Prompts LLM to correct the JSON format of the summary.
+
+        :param summary: Original summary string.
+        :param llm: LLMAPI instance.
+        :return: Corrected summary string.
+        """
+        prompt = """
+        The following text could not be extracted as JSON. Please correct or remove text from the following string format so it can be extracted as JSON while retaining appropriate information:
+        {summary}
+        Output only correct JSON format:
+        """
+        formatted_prompt = prompt.format(summary)
+        try:
+            corrected_summary = llm.invoke(formatted_prompt)
+            return corrected_summary
+        except TimeoutError:
+            logger.error("LLM invocation timed out during JSON correction.")
+            return ""
+        except Exception as e:
+            logger.error(f"LLM invocation failed during JSON correction: {e}")
+            return ""

@@ -271,7 +271,7 @@ Use the following Subgraph Data for your answer. Do not fabricate information.
 Subgraph Data:
 {input_text}
 
-Output:
+Output following the JSON format:
 """
 
 community_report_format_prompt = """
@@ -312,7 +312,7 @@ id,source,target,description
 41,VERDANT OASIS PLAZA,BAILEY ASADI,Bailey Asadi is speaking at Verdant Oasis Plaza about the march
 43,HARMONY ASSEMBLY,UNITY MARCH,Harmony Assembly is organizing the Unity March
 
-Output:
+Output following the JSON format:
 {
     "title": "Verdant Oasis Plaza and Unity March",
     "summary": "The community revolves around the Verdant Oasis Plaza, which is the location of the Unity March. The plaza has relationships with the Harmony Assembly, Unity March, and Tribune Spotlight, all of which are associated with the march event.",

@@ -53,7 +53,7 @@ class LLMAPI:
 
     # this function is used to call the completion endpoint of the LLM, not suitable for chat format
     # default timeout is 300 seconds
-    def invoke(self, text: str, max_tokens: int = 4096, temperature: float = 0.2, timeout: int = 300):
+    def invoke(self, text: str, max_tokens: int = 4096, temperature: float = 0.2, timeout: int = 360):
         url = self.url + "/completion"
         data = {
             "prompt": text,

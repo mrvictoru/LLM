@@ -6,8 +6,8 @@ services:
       "-m", "./models/Mistral-Nemo-Instruct-2407-Q6_K.gguf",
       "-t", "20",
       "-c", "8192",
-      "-n", "-2",
       "-to", "300",
+      "--n-predict", "4096",
       "--host", "0.0.0.0",
       "--port", "8080",
       "--n-gpu-layers", "200"
@@ -29,9 +29,9 @@ services:
     command: [
       "-m", "./models/Llama-3.2-3B-Instruct-Q6_K.gguf",
       "-t", "20",
-      "-c", "4096",
-      "-n", "-2",
+      "-c", "8192",
       "-to", "300",
+      "--n-predict", "4096",
       "--host", "0.0.0.0",
       "--port", "8081",
       "--n-gpu-layers", "200"
