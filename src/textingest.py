@@ -519,21 +519,29 @@ class GraphDataManager:
             # Generate a summary of the subgraph using LLM
             summary = self.summarize_subgraph(subgraph, llm)
 
-            # check if the summary can be extract as json from string
-            try:
-                json_summary = json.loads(summary)
-            except Exception as e:
-                print(f"Error: {e}")
-                print(f"Error parsing JSON for community {community_id}, correcting with LLM.")
-                # if not, pass it to an llm and have them to correct it
-                prompt = f"The following text could not be extracted as JSON. Please correct or remove text from the following string format so it can be extract as json while retaining appropiate information:\n{summary}\nOutput only correct JSON format:\n"
-                input_prompt = prompt.format(summary=summary)
-                json_summary = llm.invoke(input_prompt)
+            if summary != 'timeout':
+                # check if the summary can be extract as json from string
+                try:
+                    json_summary = json.loads(summary)
+                    print(f"JSON parsed successfully for community {community_id}.")
+                except Exception as e:
+                    print(f"Error: {e}")
+                    print(f"Error parsing JSON for community {community_id}, correcting with LLM.")
+                    # if not, pass it to an llm and have them to correct it
+                    prompt = f"The following text could not be extracted as JSON. Please correct or remove text from the following string format so it can be extract as json while retaining appropiate information:\n{summary}\nOutput only correct JSON format:\n"
+                    input_prompt = prompt.format(summary=summary)
+                    json_summary = llm.invoke(input_prompt)
 
-            self.community_summaries[community_id] = {
-                "original_summary": summary,
-                "json_summary": json_summary
-            }
+                self.community_summaries[community_id] = {
+                    "original_summary": summary,
+                    "json_summary": json_summary
+                }
+            else:
+                print(f"Timeout error for community {community_id}.")
+                self.community_summaries[community_id] = {
+                    "original_summary": summary,
+                    "json_summary": None
+                }
 
         return self.community_summaries
     
@@ -551,7 +559,15 @@ class GraphDataManager:
 
         main_prompt = self.dict_prompt["community_report_generation_prompt"]
         formatted_prompt = main_prompt.format(community_report_format_prompt=self.dict_prompt["community_report_format_prompt"], community_report_example_prompt=self.dict_prompt["community_report_example_prompt"], input_text=subgraph_str)
-
-        output = llm.invoke(formatted_prompt)
+        
+        for attempt in range(3):
+            try:
+                output = llm.invoke(formatted_prompt)
+                break
+            except TimeoutError:
+                if attempt < 2:
+                    continue
+                else:
+                    output = 'timeout'
 
         return output

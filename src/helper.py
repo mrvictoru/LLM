@@ -52,15 +52,24 @@ class LLMAPI:
         return api_data['data'][0]["embedding"]
 
     # this function is used to call the completion endpoint of the LLM, not suitable for chat format
-    def invoke(self, text: str, max_tokens: int = 4096, temperature: float = 0.2):
+    # default timeout is 300 seconds
+    def invoke(self, text: str, max_tokens: int = 4096, temperature: float = 0.2, timeout: int = 300):
         url = self.url + "/completion"
         data = {
-            "prompt":text,
-            "max token": max_tokens,
-            "temperature":temperature
+            "prompt": text,
+            "max_token": max_tokens,
+            "temperature": temperature
         }
-        response = requests.post(url, json=data)
-        api_data = response.json()
-        return api_data["content"]
+        try:
+            response = requests.post(url, json=data, timeout=timeout)
+            response.raise_for_status()
+            api_data = response.json()
+            return api_data["content"]
+        except requests.exceptions.Timeout:
+            print("Request timed out")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return None
     
 
