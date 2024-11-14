@@ -5,7 +5,9 @@ services:
     command: [
       "-m", "./models/Mistral-Nemo-Instruct-2407-Q6_K.gguf",
       "-t", "20",
-      "-c", "8000",
+      "-c", "8192",
+      "-n", "-2",
+      "-to", "300",
       "--host", "0.0.0.0",
       "--port", "8080",
       "--n-gpu-layers", "200"
@@ -28,6 +30,8 @@ services:
       "-m", "./models/Llama-3.2-3B-Instruct-Q6_K.gguf",
       "-t", "20",
       "-c", "4096",
+      "-n", "-2",
+      "-to", "300",
       "--host", "0.0.0.0",
       "--port", "8081",
       "--n-gpu-layers", "200"
