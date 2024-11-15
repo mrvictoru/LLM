@@ -532,7 +532,7 @@ class GraphDataManager:
                 continue
                 # check if the summary can be extract as json from string
 
-            json_summary = self.parse_summary_json(summary, community_id, llm, max_retries)
+            json_summary = self.parse_summary_json(summary, community_id)
             dict_summary = {
                 "community_id": community_id,
                 "summary": json_summary,
@@ -552,7 +552,7 @@ class GraphDataManager:
         for i, (u, v, data) in enumerate(subgraph.edges(data=True), start=1):
             edge_lines.append(f"{i},{u},{v},{data.get('description', 'N/A')}")
 
-        subgraph_str = "Entities\n".join(node_lines) + "\n\nRelationships\n\n" + "\n".join(edge_lines)
+        subgraph_str = "Entities:\n".join(node_lines) + "\n\nRelationships:" + "\n".join(edge_lines)
 
         main_prompt = self.dict_prompt["community_report_generation_prompt"]
         formatted_prompt = main_prompt.format(community_report_format_prompt=self.dict_prompt["community_report_format_prompt"], community_report_example_prompt=self.dict_prompt["community_report_example_prompt"], input_text=subgraph_str)
@@ -572,37 +572,18 @@ class GraphDataManager:
                 return 'timeout'
 
     
-    def parse_summary_json(self, summary, community_id, llm, max_retries):
-        """
-        Attempts to parse summary as JSON. If it fails, uses LLM to correct it.
+    def parse_summary_json(self, summary, community_id):
 
-        :param summary: Summary string from LLM.
-        :param community_id: ID of the community being processed.
-        :param llm: LLMAPI instance.
-        :param max_retries: Maximum number of retries for correction.
-        :return: Parsed JSON summary or an error message.
-        """
-        for attempt in range(1, max_retries + 1):
-            try:
-                json_summary = json.loads(summary)
-                logger.info(f"JSON parsed successfully for community {community_id}.")
-                return json_summary
-            except json.JSONDecodeError as e:
-                logger.warning(f"Attempt {attempt}: JSON parsing failed for community {community_id}: {e}")
-                if attempt < max_retries:
-                    logger.info(f"Attempting to correct JSON for community {community_id} using LLM.")
-                    summary = self.correct_summary_with_llm(summary, llm)
-                else:
-                    logger.error(f"All attempts failed to parse JSON for community {community_id}.")
-                    return {"error": summary}
-            except Exception as e:
-                logger.warning(f"Attempt {attempt}: Unknown error occurred for community {community_id}: {e}")
-                if attempt < max_retries:
-                    logger.info(f"Attempting to correct JSON for community {community_id} using LLM.")
-                    summary = self.correct_summary_with_llm(summary, llm)
-                else:
-                    logger.error(f"All attempts failed to parse JSON for community {community_id}.")
-                    return {"error": summary}
+        try:
+            json_summary = json.loads(summary)
+            logger.info(f"JSON parsed successfully for community {community_id}.")
+            return json_summary
+        except json.JSONDecodeError:
+            logger.error(f"Decoder error when parse JSON for community {community_id}.")
+            return {"error": summary}
+        except Exception as e:
+            logger.error(f"Error {e} occured when parse JSON for community {community_id}.")
+            return {"error": summary}
         
 
     def correct_summary_with_llm(self, summary, llm):

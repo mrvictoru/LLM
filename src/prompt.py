@@ -271,11 +271,10 @@ Use the following Subgraph Data for your answer. Do not fabricate information.
 Subgraph Data:
 {input_text}
 
-Output following the JSON format:
+Output:
 """
 
-community_report_format_prompt = """
-{
+community_report_format_prompt = """{
   "title": <report_title>,
   "summary": <executive_summary>,
   "rating": <impact_severity_rating>,
@@ -290,20 +289,17 @@ community_report_format_prompt = """
           "explanation": <insight_2_explanation>
       }
   ]
-}
-"""
+}"""
 
 community_report_example_prompt = """
 Subgraph Data:
 
-Entities
-
+Entities:
 id,entity,description
 5,VERDANT OASIS PLAZA,Verdant Oasis Plaza is the location of the Unity March
 6,HARMONY ASSEMBLY,Harmony Assembly is an organization that is holding a march at Verdant Oasis Plaza
 
-Relationships
-
+Relationships:
 id,source,target,description
 37,VERDANT OASIS PLAZA,UNITY MARCH,Verdant Oasis Plaza is the location of the Unity March
 38,VERDANT OASIS PLAZA,HARMONY ASSEMBLY,Harmony Assembly is holding a march at Verdant Oasis Plaza
@@ -312,7 +308,7 @@ id,source,target,description
 41,VERDANT OASIS PLAZA,BAILEY ASADI,Bailey Asadi is speaking at Verdant Oasis Plaza about the march
 43,HARMONY ASSEMBLY,UNITY MARCH,Harmony Assembly is organizing the Unity March
 
-Output following the JSON format:
+Output:
 {
   "title": "Verdant Oasis Plaza and Unity March",
   "summary": "The community revolves around the Verdant Oasis Plaza, which is the location of the Unity March. The plaza has relationships with the Harmony Assembly, Unity March, and Tribune Spotlight, all of which are associated with the march event.",
@@ -336,5 +332,4 @@ Output following the JSON format:
           "explanation": "Tribune Spotlight is reporting on the Unity March taking place in Verdant Oasis Plaza. This suggests that the event has attracted media attention, which could amplify its impact on the community. The role of Tribune Spotlight could be significant in shaping public perception of the event and the entities involved. [Data: Relationships (40)]"
       }
   ]
-}
-"""
+}"""
