@@ -292,7 +292,7 @@ community_report_format_prompt = """{
 }"""
 
 community_report_example_prompt = """
-Subgraph Data:
+First example Subgraph Data:
 
 Entities:
 id,entity,description
@@ -330,6 +330,34 @@ Output:
       {
           "summary": "Role of Tribune Spotlight",
           "explanation": "Tribune Spotlight is reporting on the Unity March taking place in Verdant Oasis Plaza. This suggests that the event has attracted media attention, which could amplify its impact on the community. The role of Tribune Spotlight could be significant in shaping public perception of the event and the entities involved. [Data: Relationships (40)]"
+      }
+  ]
+}
+
+Second example Subgraph Data:
+
+Entities:
+id,entity,description
+1,LIBERTY HALL,Liberty Hall serves as a community center for various local events
+2,PEACEMAKER SOCIETY,Peacemaker Society is dedicated to promoting harmony within the community
+
+Relationships:
+id,source,target,description
+
+Output:
+{
+  "title": "Liberty Hall and Peacemaker Society",
+  "summary": "The community includes Liberty Hall, a central location for local events, and the Peacemaker Society, an organization dedicated to promoting harmony. There are no direct relationships between the entities.",
+  "rating": 3.0,
+  "rating_explanation": "The impact severity rating is low as there are no existing relationships that could lead to potential conflicts or issues.",
+  "findings": [
+      {
+          "summary": "Liberty Hall as a community center",
+          "explanation": "Liberty Hall is a key entity in the community, serving as a hub for various local events. Its role as a central location fosters community engagement and participation. [Data: Entities (1)]"
+      },
+      {
+          "summary": "Peacemaker Society's mission",
+          "explanation": "Peacemaker Society is focused on promoting harmony within the community. Its efforts contribute to maintaining a peaceful and cooperative environment. [Data: Entities (2)]"
       }
   ]
 }"""

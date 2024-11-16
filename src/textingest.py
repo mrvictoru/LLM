@@ -585,29 +585,3 @@ class GraphDataManager:
             logger.error(f"Error {e} occured when parse JSON for community {community_id}.")
             return {"error": summary}
         
-
-    def correct_summary_with_llm(self, summary, llm):
-        """
-        Prompts LLM to correct the JSON format of the summary.
-
-        :param summary: Original summary string.
-        :param llm: LLMAPI instance.
-        :return: Corrected summary string.
-        """
-        prompt = """
-        The following text could not be extracted as JSON. Please correct or remove text from the following string format so it can be extracted as JSON while retaining appropriate information:
-        {summary}
-        Here is the json format it needs to be in:
-        {json_formatting_prompt}
-        Output only correct JSON format:
-        """
-        formatted_prompt = prompt.format(summary=summary, json_formatting_prompt=self.dict_prompt["community_report_format_prompt"])
-        try:
-            corrected_summary = llm.invoke(formatted_prompt)
-            return corrected_summary
-        except TimeoutError:
-            logger.error("LLM invocation timed out during JSON correction.")
-            return corrected_summary
-        except Exception as e:
-            logger.error(f"LLM invocation failed during JSON correction: {e}")
-            return corrected_summary
