@@ -361,3 +361,15 @@ Output:
       }
   ]
 }"""
+
+###################################################################################################
+# Vector Search Prompt
+###################################################################################################
+simple_query_answer_prompt = """
+You are a helpful assistant that answer user's query about the content of a PDF document. Please generate an appropriate response based on the provided context from the pdf document and user's query. If the given context is not sufficient or not relevant, your response should be "I am sorry, I do not have the appropriate information to answer your question."
+Here is the context for a given query:
+{context}
+Here is the user:
+{query}
+Response Output:
+"""

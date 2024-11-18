@@ -3,7 +3,7 @@ from tqdm.auto import tqdm
 import nltk
 nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
-from helper import LLMAPI
+from helper import LLMAPI, calculate_cosine_similarity
 
 import re
 import polars as pl
@@ -22,7 +22,6 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-#import node2vec
 
 class PDFDocumentHandler:
     def __init__(self, pdf_path: str, dict_prompt: dict = None, chunk_size: int = 10):
@@ -185,56 +184,6 @@ class PDFDocumentHandler:
         df = pl.DataFrame(self.chunks_and_graphs)
         df.write_json(path)
         print(f"Graphs saved to {path}.")
-
-def calculate_cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray):
-    """
-    Calculate the cosine similarity between two embeddings.
-
-    Parameters:
-        embedding1 (np.ndarray): The first embedding.
-        embedding2 (np.ndarray): The second embedding.
-
-    Returns:
-        float: The cosine similarity between the two embeddings.
-    """
-    return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
-
-def find_similar_chunk_np(prompt_embedding: np.ndarray, pages_and_chunks, threshold=0.5):
-    """
-    Find the cosine similarity between a prompt embedding and all the embeddings from embedded sentence chunks,
-    and filter the results to only include rows with a cosine similarity above a certain threshold.
-
-
-    Parameters:
-        prompt_embedding: The prompt_embedding to compare.
-        pages_and_chunks_df (pl.DataFrame): The Polars DataFrame containing page information and embeddings.
-        threshold (float): The cosine similarity threshold for filtering the results.
-
-    Returns:
-        pl.DataFrame: A Polars DataFrame containing the page number, sentence chunk, and cosine similarity score.
-    """
-    # Get the embeddings as a NumPy array
-    embeddings_np = np.stack(pages_and_chunks["embedding"].to_numpy())
-    # Stack the prompt as a NumPy array
-    prompt_np = np.stack([prompt_embedding] * embeddings_np.shape[0])
-
-    # Normalize the text embeddings
-    norm_text_embeddings = embeddings_np / np.linalg.norm(embeddings_np, axis=1, keepdims=True)
-
-    # Normalize the prompt embeddings
-    norm_prompt_embeddings = prompt_np / np.linalg.norm(prompt_np, axis=1, keepdims=True)
-
-    # Calculate the cosine similarity
-    cosine_similarity = np.diag(np.dot(norm_text_embeddings, norm_prompt_embeddings.T))
-
-    # take each element in the array and add it as a row in a new column to the dataframe
-    df = pages_and_chunks.with_columns(pl.Series("cosine_similarity", cosine_similarity))
-
-    # Filter rows based on the threshold
-    df = df.filter(pl.col("cosine_similarity") > threshold)
-    sorted_df = df.sort("cosine_similarity", descending=True)
-
-    return sorted_df.select(["page", "sentence_chunk", "cosine_similarity"])
 
 
 # the following helper function use llm api to summarize the two descriptions
@@ -532,7 +481,7 @@ class GraphDataManager:
                 continue
                 # check if the summary can be extract as json from string
 
-            json_summary = self.parse_summary_json(summary, community_id)
+            json_summary = self._parse_summary_json(summary, community_id)
             dict_summary = {
                 "community_id": community_id,
                 "summary": json_summary,
@@ -572,8 +521,7 @@ class GraphDataManager:
                 return 'timeout'
 
     
-    def parse_summary_json(self, summary, community_id):
-
+    def _parse_summary_json(self, summary, community_id):
         try:
             json_summary = json.loads(summary)
             logger.info(f"JSON parsed successfully for community {community_id}.")

@@ -1,7 +1,7 @@
 import json
 from IPython.display import Image, display
 import requests
-from prompt import check_duplicate_entities_prompt, summarize_descriptions_prompt
+import numpy as np
 
 def get_api_key(selection: int) -> str:
     
@@ -71,5 +71,18 @@ class LLMAPI:
         except requests.exceptions.RequestException as e:
             print(f"An error occurred: {e}")
             return None
+        
+def calculate_cosine_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray):
+    """
+    Calculate the cosine similarity between two embeddings.
+
+    Parameters:
+        embedding1 (np.ndarray): The first embedding.
+        embedding2 (np.ndarray): The second embedding.
+
+    Returns:
+        float: The cosine similarity between the two embeddings.
+    """
+    return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
     
 
