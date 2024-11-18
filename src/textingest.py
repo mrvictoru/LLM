@@ -447,7 +447,6 @@ class GraphDataManager:
                         )
         fig.show()
 
-    #TODO: community report gen return empty summary, investigate and debug
     def community_report_gen(self, llm:LLMAPI, max_retries:int=3):
         """
         Generates reports for each community using an LLM.

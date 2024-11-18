@@ -71,3 +71,5 @@ class Queryhandler:
         # Get the response
         response = self.llm.invoke(formatted_prompt)
         return response, similar_chunks.head(3)
+
+    #TODO: implement GraphRAG local search and global search
