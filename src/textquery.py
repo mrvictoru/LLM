@@ -73,3 +73,16 @@ class Queryhandler:
         return response, similar_chunks.head(3)
 
     #TODO: implement GraphRAG local search and global search
+    def graph_global_search_response(self, query: str, context_prompt:str = simple_query_answer_prompt):
+        """
+        Process a query and return a response based on graph global search.
+
+        Parameters:
+            query (str): The query to process.
+
+        Returns:
+            str: The response to the query.
+        """
+        # Get the response
+        response = self.llm.invoke(query)
+        return response

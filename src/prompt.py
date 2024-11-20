@@ -36,8 +36,7 @@ extraction_json_formatting_prompt = """
 """
 
 extraction_example_1_prompt = """
-TEXT: "Alice, a software engineer at TechCorp, collaborated with Bob, a data scientist at DataWorks, on a machine learning project. The project aimed to improve the recommendation system for an e-commerce platform.
-"
+TEXT: "Alice, a software engineer at TechCorp, collaborated with Bob, a data scientist at DataWorks, on a machine learning project. The project aimed to improve the recommendation system for an e-commerce platform."
 
 JSON OUPUT:
 {
@@ -104,8 +103,7 @@ JSON OUPUT:
 """
 
 extraction_example_2_prompt = """
-TEXT: "Dr. Smith, a renowned cardiologist at HeartCare Hospital, published a research paper with Dr. Johnson, a neurologist at BrainHealth Institute, on the effects of stress on heart health.
-"
+TEXT: "Dr. Smith, a renowned cardiologist at HeartCare Hospital, published a research paper with Dr. Johnson, a neurologist at BrainHealth Institute, on the effects of stress on heart health."
 
 JSON OUPUT: 
 {
@@ -296,44 +294,49 @@ First example Subgraph Data:
 
 Entities:
 id,entity,description
-5,VERDANT OASIS PLAZA,Verdant Oasis Plaza is the location of the Unity March
-6,HARMONY ASSEMBLY,Harmony Assembly is an organization that is holding a march at Verdant Oasis Plaza
+1,ALICE,A software engineer at TechCorp.
+2,TECHCORP,A technology company where Alice works.
+3,BOB,A data scientist at DataWorks.
+4,DATAWORKS,A data science company where Bob works.
+5,MACHINE LEARNING PROJECT,A project aimed to improve the recommendation system for an e-commerce platform.
 
 Relationships:
 id,source,target,description
-37,VERDANT OASIS PLAZA,UNITY MARCH,Verdant Oasis Plaza is the location of the Unity March
-38,VERDANT OASIS PLAZA,HARMONY ASSEMBLY,Harmony Assembly is holding a march at Verdant Oasis Plaza
-39,VERDANT OASIS PLAZA,UNITY MARCH,The Unity March is taking place at Verdant Oasis Plaza
-40,VERDANT OASIS PLAZA,TRIBUNE SPOTLIGHT,Tribune Spotlight is reporting on the Unity march taking place at Verdant Oasis Plaza
-41,VERDANT OASIS PLAZA,BAILEY ASADI,Bailey Asadi is speaking at Verdant Oasis Plaza about the march
-43,HARMONY ASSEMBLY,UNITY MARCH,Harmony Assembly is organizing the Unity March
+1,ALICE,TECHCORP,Alice works at TechCorp.
+2,BOB,DATAWORKS,Bob works at DataWorks.
+3,ALICE,BOB,Alice collaborated with Bob on a machine learning project.
+4,MACHINE LEARNING PROJECT,ALICE,Alice worked on the machine learning project.
+5,MACHINE LEARNING PROJECT,BOB,Bob worked on the machine learning project.
 
 Output:
 {
-  "title": "Verdant Oasis Plaza and Unity March",
-  "summary": "The community revolves around the Verdant Oasis Plaza, which is the location of the Unity March. The plaza has relationships with the Harmony Assembly, Unity March, and Tribune Spotlight, all of which are associated with the march event.",
-  "rating": 5.0,
-  "rating_explanation": "The impact severity rating is moderate due to the potential for unrest or conflict during the Unity March.",
+  "title": "Alice and Bob's Machine Learning Project",
+  "summary": "The community revolves around Alice and Bob's collaboration on a machine learning project. Alice is a software engineer at TechCorp, and Bob is a data scientist at DataWorks. The project aims to improve the recommendation system for an e-commerce platform.",
+  "rating": 7.0,
+  "rating_explanation": "The impact severity rating is high due to the potential significant improvements in the e-commerce platform's recommendation system.",
   "findings": [
       {
-          "summary": "Verdant Oasis Plaza as the central location",
-          "explanation": "Verdant Oasis Plaza is the central entity in this community, serving as the location for the Unity March. This plaza is the common link between all other entities, suggesting its significance in the community. The plaza's association with the march could potentially lead to issues such as public disorder or conflict, depending on the nature of the march and the reactions it provokes. [Data: Entities (5), Relationships (37, 38, 39, 40, 41,+more)]"
+          "summary": "Alice's role in the project",
+          "explanation": "Alice, a software engineer at TechCorp, is a key contributor to the machine learning project. Her expertise in software engineering is crucial for the project's success. [Data: Entities (1), Relationships (1, 4)]"
       },
       {
-          "summary": "Harmony Assembly's role in the community",
-          "explanation": "Harmony Assembly is another key entity in this community, being the organizer of the march at Verdant Oasis Plaza. The nature of Harmony Assembly and its march could be a potential source of threat, depending on their objectives and the reactions they provoke. The relationship between Harmony Assembly and the plaza is crucial in understanding the dynamics of this community. [Data: Entities(6), Relationships (38, 43)]"
+          "summary": "Bob's role in the project",
+          "explanation": "Bob, a data scientist at DataWorks, is another key contributor to the machine learning project. His expertise in data science is essential for the project's success. [Data: Entities (3), Relationships (2, 5)]"
       },
       {
-          "summary": "Unity March as a significant event",
-          "explanation": "The Unity March is a significant event taking place at Verdant Oasis Plaza. This event is a key factor in the community's dynamics and could be a potential source of threat, depending on the nature of the march and the reactions it provokes. The relationship between the march and the plaza is crucial in understanding the dynamics of this community. [Data: Relationships (39)]"
+          "summary": "Collaboration between Alice and Bob",
+          "explanation": "Alice and Bob collaborated on the machine learning project, combining their expertise in software engineering and data science to improve the recommendation system. [Data: Relationships (3)]"
       },
       {
-          "summary": "Role of Tribune Spotlight",
-          "explanation": "Tribune Spotlight is reporting on the Unity March taking place in Verdant Oasis Plaza. This suggests that the event has attracted media attention, which could amplify its impact on the community. The role of Tribune Spotlight could be significant in shaping public perception of the event and the entities involved. [Data: Relationships (40)]"
+          "summary": "TechCorp's involvement",
+          "explanation": "TechCorp, where Alice works, is indirectly involved in the project through Alice's contributions. The company's resources and support may have facilitated Alice's work on the project. [Data: Entities (2), Relationships (1)]"
+      },
+      {
+          "summary": "DataWorks' involvement",
+          "explanation": "DataWorks, where Bob works, is indirectly involved in the project through Bob's contributions. The company's resources and support may have facilitated Bob's work on the project. [Data: Entities (4), Relationships (2)]"
       }
   ]
 }
-
 Second example Subgraph Data:
 
 Entities:
@@ -365,6 +368,7 @@ Output:
 ###################################################################################################
 # Vector Search Prompt
 ###################################################################################################
+
 simple_query_answer_prompt = """
 You are a helpful assistant that answer user's query about the content of a PDF document. Please generate an appropriate response based on the provided context from the pdf document and user's query. If the given context is not sufficient or not relevant, your response should be "I am sorry, I do not have the appropriate information to answer your question."
 Here is the context for a given query:
@@ -372,4 +376,126 @@ Here is the context for a given query:
 Here is the user:
 {query}
 Response Output:
+"""
+
+###################################################################################################
+# GraphRAG Map Global Search Prompt
+###################################################################################################
+
+map_global_search_prompt = """
+Generate a response consisting of a list of key points that responds to the user's question, summarizing all relevant information in the input community report.
+
+You should use the information provided in the community report below as the primary context for generating the response.
+If you don't know the answer or if the input community report do not contain sufficient information to provide an answer, return and empty list. Do not make anything up.
+
+Each key point in the response should have the following element:
+- Description: A comprehensive description of the point.
+- Importance Score: An integer score between 0-100 that indicates how important the point is in answering the user's question. An 'I don't know' type of response should have a score of 0.
+
+The response should be JSON formatted as follows:
+{map_response_format}
+
+The response shall preserve the original meaning and use of modal verbs such as "shall", "may" or "will".
+
+Points supported by data should list the relevant reports as references as follows:
+"This is an example sentence supported by data references [Data: Reports (report ids)]"
+
+**Do not list more than 5 record ids in a single reference**. Instead, list the top 5 most relevant record ids and add "+more" to indicate that there are more.
+
+# Example Input:
+{map_response_example_prompt}
+
+Do not include information where the supporting evidence for it is not provided.
+
+---Community Report---
+{context_data}
+---User Query---
+{user_query}
+---Response Output---
+"""
+
+map_response_format_prompt = """
+{
+    "points": [
+        {"description": "Description of point 1 [Data: Reports (report ids)]", "score": score_value},
+        {"description": "Description of point 2 [Data: Reports (report ids)]", "score": score_value}
+    ]
+}
+"""
+
+map_response_example_prompt="""
+---First Example Community Report---
+{
+  "title": "Alice and Bob's Machine Learning Project",
+  "summary": "The community revolves around Alice and Bob's collaboration on a machine learning project. Alice is a software engineer at TechCorp, and Bob is a data scientist at DataWorks. The project aims to improve the recommendation system for an e-commerce platform.",
+  "rating": 7.0,
+  "rating_explanation": "The impact severity rating is high due to the potential significant improvements in the e-commerce platform's recommendation system.",
+  "findings": [
+      {
+          "summary": "Alice's role in the project",
+          "explanation": "Alice, a software engineer at TechCorp, is a key contributor to the machine learning project. Her expertise in software engineering is crucial for the project's success. [Data: Entities (1), Relationships (1, 4)]"
+      },
+      {
+          "summary": "Bob's role in the project",
+          "explanation": "Bob, a data scientist at DataWorks, is another key contributor to the machine learning project. His expertise in data science is essential for the project's success. [Data: Entities (3), Relationships (2, 5)]"
+      },
+      {
+          "summary": "Collaboration between Alice and Bob",
+          "explanation": "Alice and Bob collaborated on the machine learning project, combining their expertise in software engineering and data science to improve the recommendation system. [Data: Relationships (3)]"
+      },
+      {
+          "summary": "TechCorp's involvement",
+          "explanation": "TechCorp, where Alice works, is indirectly involved in the project through Alice's contributions. The company's resources and support may have facilitated Alice's work on the project. [Data: Entities (2), Relationships (1)]"
+      },
+      {
+          "summary": "DataWorks' involvement",
+          "explanation": "DataWorks, where Bob works, is indirectly involved in the project through Bob's contributions. The company's resources and support may have facilitated Bob's work on the project. [Data: Entities (4), Relationships (2)]"
+      }
+  ]
+}
+---User Query---
+Which company is involved in the machine learning project?
+---Response Output---
+{
+    "points": [
+        {"description": "TechCorp's involvement in the project [Data: Reports (1)]", "score": 8.5},
+        {"description": "DataWorks' role in supporting the project [Data: Reports (2)]", "score": 7.0}
+    ]
+}
+
+---Second Example Community Report---
+{
+  "title": "Dr. Smith and Dr. Johnson's Research Collaboration",
+  "summary": "The community revolves around Dr. Smith and Dr. Johnson's collaboration on a research paper about the effects of stress on heart health. Dr. Smith is a renowned cardiologist at HeartCare Hospital, and Dr. Johnson is a neurologist at BrainHealth Institute.",
+  "rating": 8.0,
+  "rating_explanation": "The impact severity rating is high due to the significant implications of their research on heart health.",
+  "findings": [
+      {
+          "summary": "Dr. Smith's role in the research",
+          "explanation": "Dr. Smith, a renowned cardiologist at HeartCare Hospital, is a key contributor to the research paper. His expertise in cardiology is crucial for the study's success. [Data: Entities (1), Relationships (1, 4)]"
+      },
+      {
+          "summary": "Dr. Johnson's role in the research",
+          "explanation": "Dr. Johnson, a neurologist at BrainHealth Institute, is another key contributor to the research paper. His expertise in neurology is essential for the study's success. [Data: Entities (3), Relationships (2, 5)]"
+      },
+      {
+          "summary": "Collaboration between Dr. Smith and Dr. Johnson",
+          "explanation": "Dr. Smith and Dr. Johnson collaborated on the research paper, combining their expertise in cardiology and neurology to study the effects of stress on heart health. [Data: Relationships (3)]"
+      },
+      {
+          "summary": "HeartCare Hospital's involvement",
+          "explanation": "HeartCare Hospital, where Dr. Smith works, is indirectly involved in the research through Dr. Smith's contributions. The hospital's resources and support may have facilitated Dr. Smith's work on the study. [Data: Entities (2), Relationships (1)]"
+      },
+      {
+          "summary": "BrainHealth Institute's involvement",
+          "explanation": "BrainHealth Institute, where Dr. Johnson works, is indirectly involved in the research through Dr. Johnson's contributions. The institute's resources and support may have facilitated Dr. Johnson's work on the study. [Data: Entities (4), Relationships (2)]"
+      }
+  ]
+}
+---User Query---
+Who is Dr. Smith married to?
+---Response Output---
+{
+    "points": []
+}
 """
