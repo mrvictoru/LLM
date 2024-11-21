@@ -497,5 +497,4 @@ Who is Dr. Smith married to?
 ---Response Output---
 {
     "points": []
-}
-"""
+}"""
