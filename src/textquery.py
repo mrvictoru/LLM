@@ -108,11 +108,15 @@ class Queryhandler:
         # filter the responses to only include those with a score higher than a threshold
         return [response["description"] for response in rated_inter_responses if response['score'] > threshold]
     
-    def _reduce_intermediate_responses(self, query:str, intermediate_responses: list, response_type: str = "medium_length"):
-        response = self.llm.invoke(self.dict_prompt["reduce_global_search_prompt"].format(report_data=intermediate_responses, user_query=query, response_type=response_type))
+    def _reduce_intermediate_responses(self, query:str, intermediate_responses: list, response_type: str = "multiple paragraphs"):
+        # format the intermediate responses
+        formatted_inter_responses = ''
+        for item in intermediate_responses:
+            formatted_inter_responses += f"- {item['description']} (Score: {item['score']})\n"
+        response = self.llm.invoke(self.dict_prompt["reduce_global_search_prompt"].format(report_data=formatted_inter_responses, user_query=query, response_type=response_type))
         return response
 
-    def graph_global_search_response(self, query: str, threshold: int = 0.6):
+    def graph_global_search_response(self, query: str, threshold: int = 0.6, summarise_report_type: str = "multiple paragraphs"):
         """
         Process a query and return a response based on graph global search.
 
@@ -125,6 +129,8 @@ class Queryhandler:
         # get the intermediate responses against the query and all the community summaries
         intermediate_responses = self._map_intermediate_response(query, threshold)
         # reduce the intermediate responses to a single response
+        reduced_response = self._reduce_intermediate_responses(query, intermediate_responses, response_type=summarise_report_type)
+        return reduced_response
 
 
 
