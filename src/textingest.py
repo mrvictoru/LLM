@@ -532,3 +532,11 @@ class GraphDataManager:
             logger.error(f"Error {e} occured when parse JSON for community {community_id}.")
             return {"error": summary}
         
+    def load_community_reports(self, path:str):
+        try:
+            with open(path, 'r') as file:
+                self.community_summaries = json.load(file)
+            logger.info(f"Community reports loaded from {path}.")
+        except Exception as e:
+            logger.error(f"Error loading community reports: {e}")
+            self.community_summaries = []        
