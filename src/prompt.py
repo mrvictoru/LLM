@@ -498,3 +498,32 @@ Who is Dr. Smith married to?
 {
     "points": []
 }"""
+
+reduce_global_search_prompt = """
+Generate a response that answers the user's question by summarizing all the reports from multiple analysts who focused on different parts of the dataset. The response should match the target length and format.
+
+The analysts' reports are ranked in descending order of importance.
+If the answer is unknown or if the reports lack sufficient information, state this clearly without making anything up.
+Exclude irrelevant information from the analysts' reports.
+Merge relevant information into a comprehensive answer that explains all key points and implications, appropriate for the response length and format.
+Add sections and commentary as appropriate for the length and format.
+Style the response in Markdown.
+Preserve the original meaning and use of modal verbs such as "shall", "may", or "will".
+Preserve all data references included in the analysts' reports, but do not mention the roles of multiple analysts.
+Do not list more than 5 record IDs in a single reference. Instead, list the top 5 most relevant record IDs and add "+more" to indicate additional records.
+
+For example:
+"Person X is the owner of Company Y and is subject to many allegations of wrongdoing [Data: Reports (2, 7, 34, 46, 64, +more)]. He is also the CEO of Company X [Data: Reports (1, 3)]."
+
+where 1, 2, 3, 7, 34, 46, and 64 represent the IDs (not the indexes) of the relevant data records.
+
+Do not include information without supporting evidence.
+
+---Target Response Length and Format---
+{response_type}
+---Analyst Reports---
+{report_data}
+---User Query---
+{user_query}
+---Response Output---
+"""

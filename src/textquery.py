@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 from textingest import GraphDataManager, PDFDocumentHandler, LLMAPI
 
-from prompt import simple_query_answer_prompt, map_global_search_prompt, map_response_format_prompt, map_response_example_prompt
+from prompt import simple_query_answer_prompt, map_global_search_prompt, map_response_format_prompt, map_response_example_prompt, reduce_global_search_prompt
 
 class Queryhandler:
     def __init__(self, graph_manager: GraphDataManager, pdf_handler: PDFDocumentHandler, embedding: LLMAPI, llm: LLMAPI, dict_prompt:dict = None):
@@ -21,7 +21,8 @@ class Queryhandler:
                 "simple_query_answer_prompt": simple_query_answer_prompt,
                 "map_global_search_prompt": map_global_search_prompt,
                 "map_response_format_prompt": map_response_format_prompt,
-                "map_response_example_prompt": map_response_example_prompt
+                "map_response_example_prompt": map_response_example_prompt,
+                "reduce_global_search_prompt": reduce_global_search_prompt
             }
         self.dict_prompt = dict_prompt
 
@@ -87,16 +88,7 @@ class Queryhandler:
         return response, similar_chunks.head(3)
 
     #TODO: implement GraphRAG local search and global search
-    def graph_global_search_response(self, query: str):
-        """
-        Process a query and return a response based on graph global search.
-
-        Parameters:
-            query (str): The query to process.
-
-        Returns:
-            str: The response to the query.
-        """
+    def _map_intermediate_response(self, query: str, threshold: int = 0.6):
         rated_inter_responses = []
         # loop through each community summaries (in self.graph_manager.community_summaries) and use map_global_search_prompt to get the intermediate response
         for report in self.graph_manager.community_summaries:
@@ -113,6 +105,27 @@ class Queryhandler:
                 logging.error(f"Error from community {report['community_id']} in response: {e}")
         # sort the rated_inter_responses by the score in descending order
         rated_inter_responses = sorted(rated_inter_responses, key=lambda x: x['score'], reverse=True)
+        # filter the responses to only include those with a score higher than a threshold
+        return [response["description"] for response in rated_inter_responses if response['score'] > threshold]
+    
+    def _reduce_intermediate_responses(self, query:str, intermediate_responses: list, response_type: str = "medium_length"):
+        response = self.llm.invoke(self.dict_prompt["reduce_global_search_prompt"].format(report_data=intermediate_responses, user_query=query, response_type=response_type))
+        return response
+
+    def graph_global_search_response(self, query: str, threshold: int = 0.6):
+        """
+        Process a query and return a response based on graph global search.
+
+        Parameters:
+            query (str): The query to process.
+
+        Returns:
+            str: The response to the query.
+        """
+        # get the intermediate responses against the query and all the community summaries
+        intermediate_responses = self._map_intermediate_response(query, threshold)
+        # reduce the intermediate responses to a single response
+
 
 
             
