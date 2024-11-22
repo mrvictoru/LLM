@@ -13,7 +13,7 @@ from prompt import simple_query_answer_prompt, map_global_search_prompt, map_res
 class Queryhandler:
     def __init__(self, graph_manager: GraphDataManager, pdf_handler: PDFDocumentHandler, embedding: LLMAPI, llm: LLMAPI, dict_prompt:dict = None):
         self.graph_manager = graph_manager
-        self.PDFDocumentHandler = pdf_handler
+        self.pdf_handler = pdf_handler
         self.embedding = embedding
         self.llm = llm
         if dict_prompt is None:
@@ -40,7 +40,7 @@ class Queryhandler:
         Returns:
             pl.DataFrame: A Polars DataFrame containing the page number, sentence chunk, and cosine similarity score.
         """
-        pages_and_chunks = pl.DataFrame(self.pdf_handler.get_pages_and_chunks)
+        pages_and_chunks = pl.DataFrame(self.pdf_handler.pages_and_chunks)
         # Get the embeddings as a NumPy array
         embeddings_np = np.stack(pages_and_chunks["embedding"].to_numpy())
         # Stack the prompt as a NumPy array
@@ -79,22 +79,26 @@ class Queryhandler:
         query_embedding = self.embedding.embedding_text(query)
         # Find similar chunks
         similar_chunks = self._find_similar_chunk_np(query_embedding)
-        # Get the top sentence chunk
-        context = similar_chunks["sentence_chunk"][0]
+        # Check if similar_chunks is empty
+        if similar_chunks.is_empty():
+            context = "No relevant information found."
+        else:
+            # Get the top sentence chunk
+            context = similar_chunks["sentence_chunk"][0]
         # formate the prompt
         formatted_prompt = context_prompt.format(context = context, query = query)
         # Get the response
         response = self.llm.invoke(formatted_prompt)
         return response, similar_chunks.head(3)
 
-    #TODO: implement GraphRAG local search and global search
     def _map_intermediate_response(self, query: str, threshold: int = 0.6):
         rated_inter_responses = []
         # loop through each community summaries (in self.graph_manager.community_summaries) and use map_global_search_prompt to get the intermediate response
         for report in self.graph_manager.community_summaries:
             summary = str(report['summary'])
             # Get the response
-            response = self.llm.invoke(self.dict_prompt["map_global_search_prompt"].format(summary=summary, query=query))
+            formatted_prompt = self.dict_prompt["map_global_search_prompt"].format(map_response_format=self.dict_prompt["map_response_format_prompt"], map_response_example_prompt=self.dict_prompt["map_response_example_prompt"], context_data=summary, user_query=query)
+            response = self.llm.invoke(formatted_prompt)
             # read the response as json and check if the response is an empty list
             try:
                 json_response = json.loads(response)
@@ -130,8 +134,8 @@ class Queryhandler:
         intermediate_responses = self._map_intermediate_response(query, threshold)
         # reduce the intermediate responses to a single response
         reduced_response = self._reduce_intermediate_responses(query, intermediate_responses, response_type=summarise_report_type)
-        return reduced_response
+        return reduced_response, intermediate_responses
 
-
+        #TODO: implement GraphRAG local search
 
             
