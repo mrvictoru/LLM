@@ -1,0 +1,16 @@
+version: '0.3cuda'
+services:
+  python_test_standalone:
+    build:
+      context: .
+      dockerfile: python_test/Dockerfile
+    volumes:
+      - "./src:/code"
+    working_dir: /code
+    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--NotebookApp.token='llmpython_4698'"]
+    ports:
+      - "8888:8888" # Optional: if you plan to run a Jupyter notebook or any web service
+
+volumes:
+  code:
+
