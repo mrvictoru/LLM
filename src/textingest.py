@@ -63,6 +63,7 @@ class PDFDocumentHandler:
         """
         return [sentences[i:i + self.chunk_size] for i in range(0, len(sentences), self.chunk_size)]
 
+    # TODO implement using docling
     def read_pdf(self) -> pl.DataFrame:
         """
         Reads the PDF document, extracts text content page by page, chunks sentences, and collects statistics.

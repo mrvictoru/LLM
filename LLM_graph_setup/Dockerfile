@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:slim
+FROM python:3.12.7-slim
 
 RUN apt-get update --fix-missing && \
     apt-get install -y --fix-missing build-essential pkg-config default-libmysqlclient-dev

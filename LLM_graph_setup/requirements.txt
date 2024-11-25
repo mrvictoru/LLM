@@ -12,3 +12,4 @@ nltk
 networkx
 python-louvain
 plotly
+docling
