@@ -446,6 +446,9 @@ class GraphDataManager:
                             yaxis=dict(showgrid=False, zeroline=False))
                         )
         fig.show()
+    
+    def drop_existing_community_reports(self):
+        self.community_summaries = []
 
     def community_report_gen(self, llm:LLMAPI, max_retries:int=3):
         """
@@ -455,7 +458,7 @@ class GraphDataManager:
         :param max_retries: Maximum number of retries for correcting JSON summaries.
         :return: Dictionary with community IDs as keys and their summaries as values.
         """
-
+        rejected_id = []
         # Get the community IDs
         communities = nx.get_node_attributes(self.graph, 'communityID')
 
@@ -487,8 +490,47 @@ class GraphDataManager:
                 "subgraph": subgraph_str
             }
             self.community_summaries.append(dict_summary)
+            # check if json_summary has the key value "error"
+            if "error" in json_summary:
+                rejected_id.append(community_id)
 
-        return self.community_summaries
+        return self.community_summaries, rejected_id
+
+    def regenerate_community_report(self, community_id, llm:LLMAPI, max_retries:int=1):
+        """
+        Regenerates a report for a specific community using an LLM.
+
+        :param community_id: The ID of the community to regenerate the report for.
+        :param llm: An instance of LLMAPI or similar class with an `invoke` method.
+        :param max_retries: Maximum number of retries for correcting JSON summaries.
+        :return: Dictionary with the community ID as the key and its summary as the value.
+        """
+
+        # Get the subgraph with the specified community ID
+        community_nodes = [node for node, community in nx.get_node_attributes(self.graph, 'communityID').items() if community == community_id]
+        subgraph = self.graph.subgraph(community_nodes)
+        
+        # Generate a summary of the subgraph using LLM
+        summary, subgraph_str = self.summarize_subgraph(subgraph, llm, max_retries)
+
+        if summary == 'timeout':
+            logger.error(f"LLM invocation timed out for community {community_id}. Skipping.")
+            self.community_summaries[community_id] = {"error": "Summary unavailable due to timeout."}
+
+        # check if the summary can be extract as json from string
+
+        json_summary = self._parse_summary_json(summary, community_id)
+        dict_summary = {
+            "community_id": community_id,
+            "summary": json_summary,
+            "subgraph": subgraph_str
+        }
+        # remove the old summary
+        self.community_summaries = [report for report in self.community_summaries if report['community_id'] != community_id]
+        # add the new summary
+        self.community_summaries.append(dict_summary)
+        return dict_summary
+
     
     def summarize_subgraph(self, subgraph, llm, retries):
         # Convert subgraph to the specified string format
@@ -500,7 +542,7 @@ class GraphDataManager:
         for i, (u, v, data) in enumerate(subgraph.edges(data=True), start=1):
             edge_lines.append(f"{i},{u},{v},{data.get('description', 'N/A')}")
 
-        subgraph_str = "Entities:\n".join(node_lines) + "\n\nRelationships:" + "\n".join(edge_lines)
+        subgraph_str = "Entities:\n"+"\n".join(node_lines) + "\n\nRelationships:\n" + "\n".join(edge_lines)
 
         main_prompt = self.dict_prompt["community_report_generation_prompt"]
         formatted_prompt = main_prompt.format(community_report_format_prompt=self.dict_prompt["community_report_format_prompt"], community_report_example_prompt=self.dict_prompt["community_report_example_prompt"], input_text=subgraph_str)

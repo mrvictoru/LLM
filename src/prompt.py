@@ -404,8 +404,7 @@ Points supported by data should list the relevant reports as references as follo
 
 # Example Input:
 {map_response_example_prompt}
-
-Do not include information where the supporting evidence for it is not provided.
+The following are the input Community Report and User Query, generate appropriate response according to the json format. Do not include information where the supporting evidence for it is not provided.
 
 ---Community Report---
 {context_data}

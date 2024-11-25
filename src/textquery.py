@@ -2,6 +2,7 @@ import numpy as np
 import polars as pl
 import json
 import logging
+from tqdm import tqdm
 # configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -94,24 +95,25 @@ class Queryhandler:
     def _map_intermediate_response(self, query: str, threshold: int = 0.6):
         rated_inter_responses = []
         # loop through each community summaries (in self.graph_manager.community_summaries) and use map_global_search_prompt to get the intermediate response
-        for report in self.graph_manager.community_summaries:
+        for report in tqdm(self.graph_manager.community_summaries):
             summary = str(report['summary'])
             # Get the response
             formatted_prompt = self.dict_prompt["map_global_search_prompt"].format(map_response_format=self.dict_prompt["map_response_format_prompt"], map_response_example_prompt=self.dict_prompt["map_response_example_prompt"], context_data=summary, user_query=query)
             response = self.llm.invoke(formatted_prompt)
             # read the response as json and check if the response is an empty list
+  
             try:
                 json_response = json.loads(response)
-                if json_response['point']:
-                    rated_inter_responses.extend(json_response['point'])
+                if json_response['points']:
+                    rated_inter_responses.extend(json_response['points'])
                     logging.info(f"Response lodge for community {report['community_id']}")
             except Exception as e:
                 logging.error(f"Error from community {report['community_id']} in response: {e}")
         # sort the rated_inter_responses by the score in descending order
         rated_inter_responses = sorted(rated_inter_responses, key=lambda x: x['score'], reverse=True)
         # filter the responses to only include those with a score higher than a threshold
-        return [response["description"] for response in rated_inter_responses if response['score'] > threshold]
-    
+        return [response for response in rated_inter_responses if response['score'] > threshold]
+
     def _reduce_intermediate_responses(self, query:str, intermediate_responses: list, response_type: str = "multiple paragraphs"):
         # format the intermediate responses
         formatted_inter_responses = ''
