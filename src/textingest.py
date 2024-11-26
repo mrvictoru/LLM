@@ -4,6 +4,7 @@ import nltk
 nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
 from helper import LLMAPI, calculate_cosine_similarity
+from docling.document_converter import DocumentConverter
 
 import re
 import polars as pl
@@ -63,7 +64,6 @@ class PDFDocumentHandler:
         """
         return [sentences[i:i + self.chunk_size] for i in range(0, len(sentences), self.chunk_size)]
 
-    # TODO implement using docling
     def read_pdf(self) -> pl.DataFrame:
         """
         Reads the PDF document, extracts text content page by page, chunks sentences, and collects statistics.
@@ -106,8 +106,7 @@ class PDFDocumentHandler:
             )
         self.pdf_content = pdf_content
         return pl.DataFrame(pdf_content)
-
-
+    
     def embed_chunks(self, embedding: LLMAPI) -> pl.DataFrame:
         """
         Embeds the chunks of sentences using the specified embedding model.
@@ -186,6 +185,55 @@ class PDFDocumentHandler:
         df.write_json(path)
         print(f"Graphs saved to {path}.")
 
+# TODO implement a PDFDocumentHandler class that utilizes docling and markdown format of the extracted text which doesnt have page numbers
+class MarkdownDocumentHandler(PDFDocumentHandler):
+    def __init__(self, file_path: str, dict_prompt: dict = None, chunk_size: int = 10):
+        super().__init__(pdf_path=file_path, dict_prompt=dict_prompt, chunk_size=chunk_size)
+        self.converter = DocumentConverter()
+
+    def read_pdf(self):
+        # Process the Markdown text
+        print("Converting PDF to Markdown...")
+        result = self.converter.convert(self.pdf_path)
+        md_text = result.document.export_to_markdown()
+
+        # Get the sentences from the text using NLTK
+        print("Chunking sentences...")
+        sentences = sent_tokenize(md_text)
+        sentence_count = len(sentences)
+        chunked_sentences = self.__chunk_sentences(sentences)
+
+        self.pdf_content = [{
+            "page": 1,
+            "char_count": len(md_text),
+            "word_count": len(md_text.split(" ")),
+            "sentence_spacy_count": sentence_count,
+            "chunk_count": self.chunk_size,
+            "token_count": len(md_text.split()) / 4,
+            "text": md_text,
+            "sentences": sentences,
+            "sentence_chunks": chunked_sentences,
+        }]
+        return pl.DataFrame(self.pdf_content)
+
+    def embed_chunks(self, embedding: LLMAPI) -> pl.DataFrame:
+        if self.pdf_content is None:
+            self.read_pdf()
+        pages_and_chunks = []
+        page = self.pdf_content[0]
+        for sentence_chunk in tqdm(page["sentence_chunks"], desc="Embedding chunks"):
+            chunk_dict = {}
+            chunk_dict["page"] = page["page"]
+            joined_sentence_chunk = " ".join(sentence_chunk).replace("  ", " ").strip()
+            joined_sentence_chunk = re.sub(r'\.([A-Z])', r'. \1', joined_sentence_chunk)
+            chunk_dict["sentence_chunk"] = joined_sentence_chunk
+            chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
+            chunk_dict["chunk_word_count"] = len(joined_sentence_chunk.split(" "))
+            chunk_dict["chunk_token_count"] = chunk_dict["chunk_char_count"] / 4
+            chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
+            pages_and_chunks.append(chunk_dict)
+        self.pages_and_chunks = pages_and_chunks
+        return pl.DataFrame(pages_and_chunks)
 
 # the following helper function use llm api to summarize the two descriptions
 def summarize_descriptions_llm(description1, description2, llm: LLMAPI):
