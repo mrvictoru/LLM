@@ -2,6 +2,37 @@
 # Entities and Relationships Extraction Prompt
 ###################################################################################################
 
+graph_extraction_prompt ="""
+Extract entities and relationships from the following text and format them for a knowledge graph. Given a text document that is potentially relevant to this activity and a list of entity types, identify all entities of those types from the text and all relationships among the identified entities.
+-Steps-
+1. Identify all entities. For each identified entity, extract the following information:
+- entity_name: Name of the entity, capitalized
+- entity_type: Appropriate entity type
+- entity_description: Comprehensive description of the entity's attributes and activities
+2. From the entities identified in step 1, identify all pairs of (source_entity, target_entity) that are *clearly related* to each other.
+For each pair of related entities, extract the following information:
+- source_entity: name of the source entity, as identified in step 1
+- target_entity: name of the target entity, as identified in step 1
+- relationship_description: explanation as to why you think the source entity and the target entity are related to each other
+- relationship_strength: a numeric score indicating strength of the relationship between the source entity and target entity
+3. Return output in list of json of all the entities and relationships identified in steps 1 and 2, if no entities and relationships is identify, return an empty json.
+
+JSON Format:
+{extraction_json_formatting_prompt}
+
+**Example 1:**
+{extraction_example_1_prompt}
+
+**Example 2:**
+{extraction_example_2_prompt}
+
+Now, based on these examples, please extract the entities and relationships from the following text and return the information in the same structured format:
+
+Here is the text:{text}
+
+JSON OUPUT:
+"""
+
 extraction_json_formatting_prompt = """
 {
   "entities": [
@@ -169,36 +200,6 @@ JSON OUPUT:
 }
 """
 
-graph_extraction_prompt ="""
-Extract entities and relationships from the following text and format them for a knowledge graph. Given a text document that is potentially relevant to this activity and a list of entity types, identify all entities of those types from the text and all relationships among the identified entities.
--Steps-
-1. Identify all entities. For each identified entity, extract the following information:
-- entity_name: Name of the entity, capitalized
-- entity_type: Appropriate entity type
-- entity_description: Comprehensive description of the entity's attributes and activities
-2. From the entities identified in step 1, identify all pairs of (source_entity, target_entity) that are *clearly related* to each other.
-For each pair of related entities, extract the following information:
-- source_entity: name of the source entity, as identified in step 1
-- target_entity: name of the target entity, as identified in step 1
-- relationship_description: explanation as to why you think the source entity and the target entity are related to each other
-- relationship_strength: a numeric score indicating strength of the relationship between the source entity and target entity
-3. Return output in list of json of all the entities and relationships identified in steps 1 and 2, if no entities and relationships is identify, return an empty json.
-
-JSON Format:
-{extraction_json_formatting_prompt}
-
-**Example 1:**
-{extraction_example_1_prompt}
-
-**Example 2:**
-{extraction_example_2_prompt}
-
-Now, based on these examples, please extract the entities and relationships from the following text and return the information in the same structured format:
-
-Here is the text:{text}
-
-JSON OUPUT:
-"""
 ###################################################################################################
 # Duplicate Entities Detection Prompt
 ###################################################################################################
