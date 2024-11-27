@@ -130,7 +130,12 @@ class PDFDocumentHandler:
                 chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
                 chunk_dict["chunk_word_count"] = len(joined_sentence_chunk.split(" "))
                 chunk_dict["chunk_token_count"] = chunk_dict["chunk_char_count"] / 4  # 1 token = ~4 characters
-                chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
+                try:
+                    chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
+                except Exception as e:
+                    print(f"Error embedding text: {e}")
+                    print(f"Text: {joined_sentence_chunk}")
+                    chunk_dict["embedding"] = np.zeros(384)
 
                 pages_and_chunks.append(chunk_dict)
 
@@ -201,7 +206,7 @@ class MarkdownDocumentHandler(PDFDocumentHandler):
         print("Chunking sentences...")
         sentences = sent_tokenize(md_text)
         sentence_count = len(sentences)
-        chunked_sentences = self.__chunk_sentences(sentences)
+        chunked_sentences = self._PDFDocumentHandler__chunk_sentences(sentences)
 
         self.pdf_content = [{
             "page": 1,
@@ -230,7 +235,12 @@ class MarkdownDocumentHandler(PDFDocumentHandler):
             chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
             chunk_dict["chunk_word_count"] = len(joined_sentence_chunk.split(" "))
             chunk_dict["chunk_token_count"] = chunk_dict["chunk_char_count"] / 4
-            chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
+            try:
+                chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
+            except Exception as e:
+                print(f"Error embedding text: {e}")
+                print(f"Text: {joined_sentence_chunk}")
+                chunk_dict["embedding"] = np.zeros(384)
             pages_and_chunks.append(chunk_dict)
         self.pages_and_chunks = pages_and_chunks
         return pl.DataFrame(pages_and_chunks)

@@ -15,9 +15,14 @@ sudo docker compose -f docker-compose-server.yml down -v
 - if you want to start a python environment with llama-cpp-python installed, run the following:
 sudo docker compose -f docker-compose-python.yml up
 
+- **For the graphrag implementation, use the following:
+sudo docker compose -f docker-compose-server-graph.yml up
+
 Notebook:
 testresponse.ipynb -> for testing response with ther server
 
 agent_test.ipynb -> for test running ReAct agent
 
 langchain_sql_test.ipynb -> for test running langchain TEXT2SQL workflow
+
+testllmgraph.ipynb -> for test running the my custom index and query process (with vector search and graphrag global search)

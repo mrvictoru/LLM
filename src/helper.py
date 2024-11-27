@@ -44,12 +44,20 @@ class LLMAPI:
             raise e
     
     # this function is used to call the embedding endpoint of the LLM
-    def embedding_text(self, text: str):
+    def embedding_text(self, text: str, timeout: int = 60):
         url = self.url + '/embedding'
         data = {"input": text, "thread": 5}
-        response = requests.post(url, json=data)
-        api_data = response.json()
-        return api_data['data'][0]["embedding"]
+        try:
+            response = requests.post(url, json=data, timeout=timeout)
+            response.raise_for_status()
+            api_data = response.json()
+            return api_data['data'][0]["embedding"]
+        except requests.exceptions.Timeout:
+            print("Request timed out")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return None
 
     # this function is used to call the completion endpoint of the LLM, not suitable for chat format
     # default timeout is 300 seconds
