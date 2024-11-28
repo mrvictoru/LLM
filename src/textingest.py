@@ -130,13 +130,13 @@ class PDFDocumentHandler:
                 chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
                 chunk_dict["chunk_word_count"] = len(joined_sentence_chunk.split(" "))
                 chunk_dict["chunk_token_count"] = chunk_dict["chunk_char_count"] / 4  # 1 token = ~4 characters
-                try:
-                    chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
-                except Exception as e:
-                    print(f"Error embedding text: {e}")
-                    print(f"Text: {joined_sentence_chunk}")
-                    chunk_dict["embedding"] = np.zeros(384)
-
+                
+                emb_array = embedding.embedding_text(joined_sentence_chunk)
+                if emb_array is None:
+                    logger.error(f"Error embedding text: {e}")
+                    logger.error(f"Text: {joined_sentence_chunk}")
+                    continue
+                chunk_dict["embedding"] = np.array(emb_array)
                 pages_and_chunks.append(chunk_dict)
 
         self.pages_and_chunks = pages_and_chunks
@@ -144,7 +144,7 @@ class PDFDocumentHandler:
     
     def __get_graph(self, text:str, nlp: LLMAPI):
         main_prompt = self.dict_prompt["graph_extraction_prompt"]
-        formatted_prompt = main_prompt.format(json_formatting_prompt=self.dict_prompt["json_formatting_prompt"], example_1_prompt=self.dict_prompt["example_1_prompt"], example_2_prompt=self.dict_prompt["example_2_prompt"], text=text)
+        formatted_prompt = main_prompt.format(extraction_json_formatting_prompt=self.dict_prompt["json_formatting_prompt"], extraction_example_1_prompt=self.dict_prompt["example_1_prompt"], extraction_example_2_prompt=self.dict_prompt["example_2_prompt"], text=text)
         output = nlp.invoke(formatted_prompt)
         # check if the output is valid JSON
         try:
@@ -226,7 +226,9 @@ class MarkdownDocumentHandler(PDFDocumentHandler):
             self.read_pdf()
         pages_and_chunks = []
         page = self.pdf_content[0]
+
         for sentence_chunk in tqdm(page["sentence_chunks"], desc="Embedding chunks"):
+
             chunk_dict = {}
             chunk_dict["page"] = page["page"]
             joined_sentence_chunk = " ".join(sentence_chunk).replace("  ", " ").strip()
@@ -235,12 +237,13 @@ class MarkdownDocumentHandler(PDFDocumentHandler):
             chunk_dict["chunk_char_count"] = len(joined_sentence_chunk)
             chunk_dict["chunk_word_count"] = len(joined_sentence_chunk.split(" "))
             chunk_dict["chunk_token_count"] = chunk_dict["chunk_char_count"] / 4
-            try:
-                chunk_dict["embedding"] = np.array(embedding.embedding_text(joined_sentence_chunk))
-            except Exception as e:
-                print(f"Error embedding text: {e}")
-                print(f"Text: {joined_sentence_chunk}")
-                chunk_dict["embedding"] = np.zeros(384)
+            
+            emb_array = embedding.embedding_text(joined_sentence_chunk)
+            if emb_array is None:
+                print("Error embedding text")
+                print("Text: ", joined_sentence_chunk)
+                continue
+            chunk_dict["embedding"] = np.array(emb_array)
             pages_and_chunks.append(chunk_dict)
         self.pages_and_chunks = pages_and_chunks
         return pl.DataFrame(pages_and_chunks)
