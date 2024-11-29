@@ -52,17 +52,26 @@ class PDFDocumentHandler:
             self.pdf_document.close()
 
 
-    def __chunk_sentences(self, sentences: list[str]) -> list[list[str]]:
+    def __chunk_sentences(self, sentences: list[str], overlap_size: int = 2) -> list[list[str]]:
         """
-        Chunks a list of sentences into groups of a specified size.
-
+        Chunks a list of sentences into overlapping groups of a specified size.
+    
         Parameters:
             sentences (list[str]): A list of sentences to be chunked.
-
+            overlap_size (int): Number of overlapping sentences between chunks.
+    
         Returns:
-            list[list[str]]: A list of lists, each containing a chunk of sentences.
+            list[list[str]]: A list of lists, each containing a chunk of sentences with overlap.
         """
-        return [sentences[i:i + self.chunk_size] for i in range(0, len(sentences), self.chunk_size)]
+        if overlap_size >= self.chunk_size:
+            raise ValueError("overlap_size must be smaller than chunk_size.")
+        
+        step_size = self.chunk_size - overlap_size
+        chunks = []
+        for i in range(0, len(sentences), step_size):
+            chunk = sentences[i:i + self.chunk_size]
+            chunks.append(chunk)
+        return chunks
 
     def read_pdf(self) -> pl.DataFrame:
         """
@@ -150,8 +159,10 @@ class PDFDocumentHandler:
         try:
             json_output = json.loads(output)
         except json.JSONDecodeError:
+            print(text)
             print(output)
-            raise ValueError("Invalid JSON output from the NLP model.")
+            print("Invalid JSON output from the NLP model.")
+            return None
         return json_output
 
     def graph_extraction(self, nlp: LLMAPI) -> pl.DataFrame:

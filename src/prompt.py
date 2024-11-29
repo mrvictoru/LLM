@@ -3,9 +3,18 @@
 ###################################################################################################
 
 graph_extraction_prompt ="""
-Extract entities and relationships from the following text and format them for a knowledge graph. Given a text document that is potentially relevant to this activity and a list of entity types, identify all entities of those types from the text and all relationships among the identified entities.
+Extract entities and relationships from the following text and format them for a knowledge graph. Focus primarily on types such as people, organisation or location used within the text. Given a text document that is potentially relevant to this activity and a list of entity types, identify all entities of those types from the text and all relationships among the identified entities.
+
+- **Entity Types to Focus On:**
+  - Person
+  - Organization
+  - Location
+  - Tool
+  - Concept
+  - Process
+
 -Steps-
-1. Identify all entities. For each identified entity, extract the following information:
+1. Identify all distinct entities. For each identified entity, extract the following information:
 - entity_name: Name of the entity, capitalized
 - entity_type: Appropriate entity type
 - entity_description: Comprehensive description of the entity's attributes and activities
@@ -26,7 +35,7 @@ JSON Format:
 **Example 2:**
 {extraction_example_2_prompt}
 
-Now, based on these examples, please extract the entities and relationships from the following text and return the information in the same structured format:
+Now, based on these examples, please extract the distinct entities and relationships from the following text and return the information in the same structured format:
 
 Here is the text:{text}
 
