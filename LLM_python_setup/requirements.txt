@@ -10,11 +10,6 @@ jupyter
 numpy
 polars
 openai
-langchain
-langchain_community
-langchain_openai
-langgraph
-langsmith
 chromadb
 requests
 mysqlclient
@@ -22,4 +17,6 @@ pymupdf
 tqdm
 setuptools
 wheel
-spacy
+nltk
+smolagents
+transformers

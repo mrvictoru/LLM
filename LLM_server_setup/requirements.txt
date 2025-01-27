@@ -14,4 +14,6 @@ pymupdf
 tqdm
 setuptools
 wheel
-spacy
+nltk
+smolagents
+transformers
