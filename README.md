@@ -26,3 +26,5 @@ agent_test.ipynb -> for test running ReAct agent
 langchain_sql_test.ipynb -> for test running langchain TEXT2SQL workflow
 
 testllmgraph.ipynb -> for test running the my custom index and query process (with vector search and graphrag global search)
+
+testsmolagents.ipynb -> for test running huggingface smolagent library 
