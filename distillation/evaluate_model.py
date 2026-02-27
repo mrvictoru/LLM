@@ -114,39 +114,46 @@ def extract_html(raw: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Public API (importable from notebook or other scripts)
 # ---------------------------------------------------------------------------
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate a model on website generation test cases.")
-    parser.add_argument("--model_name", required=True, help="HuggingFace model id or local path")
-    parser.add_argument("--adapter_path", default=None, help="Path to LoRA adapter (optional)")
-    parser.add_argument("--output_dir", default="./eval_results", help="Directory to save HTML outputs")
-    parser.add_argument("--max_new_tokens", type=int, default=2048)
-    parser.add_argument("--prompts_file", default="prompts.json",
-                        help="Path to JSON file with eval_test_cases")
-    return parser.parse_args()
+def evaluate(
+    model_name: str,
+    output_dir: str = "./eval_results",
+    adapter_path: str | None = None,
+    max_new_tokens: int = 2048,
+    prompts_file: str = "prompts.json",
+) -> list[dict]:
+    """Evaluate a model on website-generation test cases and save HTML outputs.
 
+    Args:
+        model_name:     HuggingFace model id or local path for the student model.
+        output_dir:     Directory where generated HTML files and summary.json are saved.
+        adapter_path:   Optional path to a LoRA adapter to apply before inference.
+        max_new_tokens: Maximum tokens to generate per test case.
+        prompts_file:   Path to the JSON file with eval_test_cases.
 
-def main() -> None:
-    args = parse_args()
-    os.makedirs(args.output_dir, exist_ok=True)
+    Returns:
+        List of result dicts with keys: id, output_file, char_count,
+        starts_with_html, has_body, has_script_or_style.
+    """
+    os.makedirs(output_dir, exist_ok=True)
 
-    test_cases = load_test_cases(args.prompts_file)
-    print(f"Loaded {len(test_cases)} eval test cases from {args.prompts_file}.")
+    test_cases = load_test_cases(prompts_file)
+    print(f"Loaded {len(test_cases)} eval test cases from {prompts_file}.")
 
-    print(f"Loading model: {args.model_name}")
-    if args.adapter_path:
-        print(f"Applying adapter: {args.adapter_path}")
-    model, tokenizer = load_model_and_tokenizer(args.model_name, args.adapter_path)
+    print(f"Loading model: {model_name}")
+    if adapter_path:
+        print(f"Applying adapter: {adapter_path}")
+    model, tokenizer = load_model_and_tokenizer(model_name, adapter_path)
 
     results = []
     for tc in test_cases:
         print(f"\n[{tc['id']}] Generating …")
-        raw = generate_html(model, tokenizer, tc["instruction"], max_new_tokens=args.max_new_tokens)
+        raw = generate_html(model, tokenizer, tc["instruction"], max_new_tokens=max_new_tokens)
         html = extract_html(raw)
 
-        out_path = os.path.join(args.output_dir, f"{tc['id']}.html")
+        out_path = os.path.join(output_dir, f"{tc['id']}.html")
         with open(out_path, "w", encoding="utf-8") as fh:
             fh.write(html)
 
@@ -175,10 +182,38 @@ def main() -> None:
             f"script/style={r['has_script_or_style']}"
         )
 
-    summary_path = os.path.join(args.output_dir, "summary.json")
+    summary_path = os.path.join(output_dir, "summary.json")
     with open(summary_path, "w", encoding="utf-8") as fh:
         json.dump(results, fh, indent=2)
     print(f"\nSummary saved to {summary_path}")
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Evaluate a model on website generation test cases.")
+    parser.add_argument("--model_name", required=True, help="HuggingFace model id or local path")
+    parser.add_argument("--adapter_path", default=None, help="Path to LoRA adapter (optional)")
+    parser.add_argument("--output_dir", default="./eval_results", help="Directory to save HTML outputs")
+    parser.add_argument("--max_new_tokens", type=int, default=2048)
+    parser.add_argument("--prompts_file", default="prompts.json",
+                        help="Path to JSON file with eval_test_cases")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    evaluate(
+        model_name=args.model_name,
+        output_dir=args.output_dir,
+        adapter_path=args.adapter_path,
+        max_new_tokens=args.max_new_tokens,
+        prompts_file=args.prompts_file,
+    )
 
 
 if __name__ == "__main__":

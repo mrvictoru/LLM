@@ -96,7 +96,82 @@ def query_openrouter(
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Public API (importable from notebook or other scripts)
+# ---------------------------------------------------------------------------
+
+def generate_dataset(
+    api_key: str,
+    output: str = "website_dataset.jsonl",
+    model: str = "qwen/qwen3-235b-a22b-thinking-2507",
+    n_samples: int = 200,
+    max_tokens: int = 50000,
+    temperature: float = 0.7,
+    delay: float = 1.0,
+    prompts_file: str = "prompts.json",
+) -> None:
+    """Generate website HTML training data via OpenRouter and save to a JSONL file.
+
+    Args:
+        api_key:      OpenRouter API key.
+        output:       Path of the output JSONL file.
+        model:        OpenRouter model id to use as the teacher.
+        n_samples:    Total number of training samples to generate.
+        max_tokens:   Maximum tokens per model response.
+        temperature:  Sampling temperature.
+        delay:        Seconds to wait between API requests.
+        prompts_file: Path to the JSON file with training_topics and instruction_templates.
+    """
+    if not api_key:
+        raise ValueError(
+            "OpenRouter API key is required. "
+            "Pass api_key= explicitly or set the OPENROUTER_API_KEY environment variable."
+        )
+
+    topics, templates = load_prompts(prompts_file)
+    print(f"Loaded {len(topics)} topics and {len(templates)} templates from {prompts_file}.")
+
+    # Cycle through topics and templates to reach n_samples
+    samples = []
+    for i in range(n_samples):
+        topic = topics[i % len(topics)]
+        instruction = build_prompt(topic, templates, template_idx=i)
+        samples.append(instruction)
+
+    existing = set()
+    if os.path.exists(output):
+        with open(output, "r", encoding="utf-8") as fh:
+            for line in fh:
+                obj = json.loads(line)
+                existing.add(obj["instruction"])
+        print(f"Resuming — {len(existing)} samples already in {output}.")
+
+    with open(output, "a", encoding="utf-8") as out_fh:
+        for instruction in tqdm(samples, desc="Generating"):
+            if instruction in existing:
+                continue
+            response = query_openrouter(
+                prompt=instruction,
+                api_key=api_key,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            if response:
+                record = {
+                    "instruction": instruction,
+                    "input": "",
+                    "output": response,
+                }
+                out_fh.write(json.dumps(record) + "\n")
+                out_fh.flush()
+                existing.add(instruction)
+            time.sleep(delay)
+
+    print(f"Done. {len(existing)} samples saved to {output}.")
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
@@ -115,52 +190,16 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-
-    if not args.api_key:
-        raise ValueError("OpenRouter API key is required. Pass --api_key or set OPENROUTER_API_KEY.")
-
-    topics, templates = load_prompts(args.prompts_file)
-    print(f"Loaded {len(topics)} topics and {len(templates)} templates from {args.prompts_file}.")
-
-    # Cycle through topics and templates to reach n_samples
-    samples = []
-    for i in range(args.n_samples):
-        topic = topics[i % len(topics)]
-        instruction = build_prompt(topic, templates, template_idx=i)
-        samples.append(instruction)
-
-    output_path = args.output
-    existing = set()
-    if os.path.exists(output_path):
-        with open(output_path, "r", encoding="utf-8") as fh:
-            for line in fh:
-                obj = json.loads(line)
-                existing.add(obj["instruction"])
-        print(f"Resuming — {len(existing)} samples already in {output_path}.")
-
-    with open(output_path, "a", encoding="utf-8") as out_fh:
-        for instruction in tqdm(samples, desc="Generating"):
-            if instruction in existing:
-                continue
-            response = query_openrouter(
-                prompt=instruction,
-                api_key=args.api_key,
-                model=args.model,
-                max_tokens=args.max_tokens,
-                temperature=args.temperature,
-            )
-            if response:
-                record = {
-                    "instruction": instruction,
-                    "input": "",
-                    "output": response,
-                }
-                out_fh.write(json.dumps(record) + "\n")
-                out_fh.flush()
-                existing.add(instruction)
-            time.sleep(args.delay)
-
-    print(f"Done. {len(existing)} samples saved to {output_path}.")
+    generate_dataset(
+        api_key=args.api_key,
+        output=args.output,
+        model=args.model,
+        n_samples=args.n_samples,
+        max_tokens=args.max_tokens,
+        temperature=args.temperature,
+        delay=args.delay,
+        prompts_file=args.prompts_file,
+    )
 
 
 if __name__ == "__main__":
