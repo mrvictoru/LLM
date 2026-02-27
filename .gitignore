@@ -20,3 +20,12 @@ src/testoutput
 *.tmp
 *.bak
 *.conf
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Distillation outputs / generated data (large files, not committed)
+distillation/website_dataset.jsonl
+distillation/outputs/
+distillation/eval_results/
