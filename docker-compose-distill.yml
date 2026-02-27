@@ -1,0 +1,26 @@
+version: '3'
+services:
+  distill_dev:
+    build:
+      context: .
+      dockerfile: LLM_distill_setup/Dockerfile
+    volumes:
+      - "./distillation:/code"
+      - "./models:/code/models"
+    working_dir: /code
+    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--NotebookApp.token=${JUPYTER_TOKEN:-}"]
+    ports:
+      - "8888:8888"
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - HF_TOKEN=${HF_TOKEN}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  distill_data:
