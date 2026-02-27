@@ -5,6 +5,9 @@ Evaluates a (fine-tuned or base) smaller LLM on a handful of single-file website
 generation prompts and saves the generated HTML files so you can open them in a
 browser to visually inspect quality.
 
+Test cases are loaded from a JSON prompts file (default: prompts.json) so they
+can be edited without touching this script.
+
 Usage:
     # Evaluate a base model
     python evaluate_model.py \
@@ -13,19 +16,25 @@ Usage:
 
     # Evaluate a fine-tuned LoRA adapter
     python evaluate_model.py \
-        --model_name  unsloth/Llama-3.2-3B-Instruct \
+        --model_name   unsloth/Llama-3.2-3B-Instruct \
         --adapter_path ./outputs/lora_model \
-        --output_dir  ./eval_results/finetuned
+        --output_dir   ./eval_results/finetuned
+
+    # Use a custom prompts file
+    python evaluate_model.py \
+        --model_name   unsloth/Llama-3.2-3B-Instruct \
+        --prompts_file prompts.json \
+        --output_dir   ./eval_results/base
 """
 
 import argparse
+import json
 import os
 
 import torch
-from transformers import TextStreamer
 
 # ---------------------------------------------------------------------------
-# Test prompts
+# System prompt (same as training)
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = (
@@ -35,28 +44,16 @@ SYSTEM_PROMPT = (
     "Output ONLY the raw HTML — no explanations, no markdown fences."
 )
 
-TEST_CASES = [
-    {
-        "id": "todo_app",
-        "instruction": "Create a single-file HTML website: a simple todo list app with add/delete functionality.",
-    },
-    {
-        "id": "portfolio",
-        "instruction": "Build a self-contained HTML page for a personal portfolio page for a software engineer.",
-    },
-    {
-        "id": "pomodoro_timer",
-        "instruction": "Write a complete single-file HTML + CSS + JS website that implements a Pomodoro productivity timer.",
-    },
-    {
-        "id": "quiz_app",
-        "instruction": "Generate a responsive single-file HTML website for an interactive quiz with score tracking. Include all styles and scripts inline.",
-    },
-    {
-        "id": "snake_game",
-        "instruction": "Produce a polished, self-contained HTML file that acts as a snake game in a canvas element.",
-    },
-]
+
+def load_test_cases(prompts_file: str) -> list[dict]:
+    """Load eval test cases from the prompts JSON file."""
+    with open(prompts_file, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    test_cases = data["eval_test_cases"]
+    if not test_cases:
+        raise ValueError(f"No eval_test_cases found in {prompts_file}")
+    # Return only the required fields so extra metadata keys in the JSON are ignored
+    return [{"id": tc["id"], "instruction": tc["instruction"]} for tc in test_cases]
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +123,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adapter_path", default=None, help="Path to LoRA adapter (optional)")
     parser.add_argument("--output_dir", default="./eval_results", help="Directory to save HTML outputs")
     parser.add_argument("--max_new_tokens", type=int, default=2048)
+    parser.add_argument("--prompts_file", default="prompts.json",
+                        help="Path to JSON file with eval_test_cases")
     return parser.parse_args()
 
 
@@ -133,13 +132,16 @@ def main() -> None:
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
 
+    test_cases = load_test_cases(args.prompts_file)
+    print(f"Loaded {len(test_cases)} eval test cases from {args.prompts_file}.")
+
     print(f"Loading model: {args.model_name}")
     if args.adapter_path:
         print(f"Applying adapter: {args.adapter_path}")
     model, tokenizer = load_model_and_tokenizer(args.model_name, args.adapter_path)
 
     results = []
-    for tc in TEST_CASES:
+    for tc in test_cases:
         print(f"\n[{tc['id']}] Generating …")
         raw = generate_html(model, tokenizer, tc["instruction"], max_new_tokens=args.max_new_tokens)
         html = extract_html(raw)
@@ -173,7 +175,6 @@ def main() -> None:
             f"script/style={r['has_script_or_style']}"
         )
 
-    import json
     summary_path = os.path.join(args.output_dir, "summary.json")
     with open(summary_path, "w", encoding="utf-8") as fh:
         json.dump(results, fh, indent=2)

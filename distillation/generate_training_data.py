@@ -4,12 +4,16 @@ generate_training_data.py
 Generates a dataset of (instruction, response) pairs for single-file HTML website
 creation by querying a capable model via the OpenRouter API.
 
+Topics and instruction templates are loaded from a JSON prompts file
+(default: prompts.json) so they can be edited without touching this script.
+
 Usage:
     python generate_training_data.py \
-        --api_key  YOUR_OPENROUTER_KEY \
-        --model    anthropic/claude-3.5-sonnet \
-        --n_samples 200 \
-        --output   website_dataset.jsonl
+        --api_key      YOUR_OPENROUTER_KEY \
+        --model        anthropic/claude-3.5-sonnet \
+        --n_samples    200 \
+        --output       website_dataset.jsonl \
+        --prompts_file prompts.json
 """
 
 import argparse
@@ -20,7 +24,7 @@ import requests
 from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
-# Prompt templates
+# System prompt (shared with evaluate_model.py and train_model.py)
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = (
@@ -30,60 +34,22 @@ SYSTEM_PROMPT = (
     "Output ONLY the raw HTML — no explanations, no markdown fences."
 )
 
-WEBSITE_TOPICS = [
-    "a personal portfolio page for a software engineer",
-    "a landing page for a mobile app",
-    "a simple todo list app with add/delete functionality",
-    "a countdown timer to a user-specified date",
-    "a BMI calculator with a results display",
-    "a flashcard quiz app for learning vocabulary",
-    "a minimal blog homepage with three sample posts",
-    "a responsive pricing page with three tiers",
-    "a weather dashboard with a search bar (mock data)",
-    "a Pomodoro productivity timer",
-    "a dark-mode toggle demo page",
-    "a simple image gallery with lightbox effect",
-    "a contact form with client-side validation",
-    "a currency converter (mock exchange rates)",
-    "a markdown previewer",
-    "a color palette generator",
-    "a simple drawing canvas with color picker",
-    "an interactive quiz with score tracking",
-    "a recipe card page with ingredients and steps",
-    "a music player UI (no audio required, mock UI)",
-    "a kanban board with three columns (To Do, In Progress, Done)",
-    "a login and register modal demo",
-    "a typing speed test app",
-    "a digital clock showing hours, minutes and seconds",
-    "a progress bar animation demo",
-    "a star rating component",
-    "a responsive navbar with hamburger menu",
-    "a testimonial carousel slider",
-    "a snake game in a canvas element",
-    "a tic-tac-toe game",
-    "a memory card matching game",
-    "a simple e-commerce product card grid",
-    "a FAQ accordion page",
-    "a modal dialog demo with overlay",
-    "a sticky header that changes color on scroll",
-    "a multi-step form wizard",
-    "a skeleton loading screen demo",
-    "a drag-and-drop sortable list",
-    "a data table with sorting and filtering",
-    "a line chart using only SVG (no external libraries)",
-]
 
-INSTRUCTION_TEMPLATES = [
-    "Create a single-file HTML website: {topic}.",
-    "Build a self-contained HTML page for {topic}.",
-    "Write a complete single-file HTML + CSS + JS website that implements {topic}.",
-    "Generate a responsive single-file HTML website for {topic}. Include all styles and scripts inline.",
-    "Produce a polished, self-contained HTML file that acts as {topic}.",
-]
+def load_prompts(prompts_file: str) -> tuple[list[str], list[str]]:
+    """Load training topics and instruction templates from the prompts JSON file."""
+    with open(prompts_file, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    topics = data["training_topics"]
+    templates = data["instruction_templates"]
+    if not topics:
+        raise ValueError(f"No training_topics found in {prompts_file}")
+    if not templates:
+        raise ValueError(f"No instruction_templates found in {prompts_file}")
+    return topics, templates
 
 
-def build_prompt(topic: str, template_idx: int = 0) -> str:
-    tmpl = INSTRUCTION_TEMPLATES[template_idx % len(INSTRUCTION_TEMPLATES)]
+def build_prompt(topic: str, templates: list[str], template_idx: int = 0) -> str:
+    tmpl = templates[template_idx % len(templates)]
     return tmpl.format(topic=topic)
 
 
@@ -142,6 +108,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--output", default="website_dataset.jsonl", help="Output JSONL file")
     parser.add_argument("--delay", type=float, default=1.0, help="Seconds to wait between requests")
+    parser.add_argument("--prompts_file", default="prompts.json",
+                        help="Path to JSON file with training_topics and instruction_templates")
     return parser.parse_args()
 
 
@@ -151,11 +119,14 @@ def main() -> None:
     if not args.api_key:
         raise ValueError("OpenRouter API key is required. Pass --api_key or set OPENROUTER_API_KEY.")
 
+    topics, templates = load_prompts(args.prompts_file)
+    print(f"Loaded {len(topics)} topics and {len(templates)} templates from {args.prompts_file}.")
+
     # Cycle through topics and templates to reach n_samples
     samples = []
     for i in range(args.n_samples):
-        topic = WEBSITE_TOPICS[i % len(WEBSITE_TOPICS)]
-        instruction = build_prompt(topic, template_idx=i)
+        topic = topics[i % len(topics)]
+        instruction = build_prompt(topic, templates, template_idx=i)
         samples.append(instruction)
 
     output_path = args.output
