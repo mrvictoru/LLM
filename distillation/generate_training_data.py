@@ -136,9 +136,9 @@ def query_openrouter(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate website HTML training data via OpenRouter.")
     parser.add_argument("--api_key", default=os.getenv("OPENROUTER_API_KEY"), help="OpenRouter API key")
-    parser.add_argument("--model", default="anthropic/claude-3.5-sonnet", help="OpenRouter model id")
+    parser.add_argument("--model", default="qwen/qwen3-235b-a22b-thinking-2507", help="OpenRouter model id")
     parser.add_argument("--n_samples", type=int, default=200, help="Total samples to generate")
-    parser.add_argument("--max_tokens", type=int, default=4096, help="Max tokens per response")
+    parser.add_argument("--max_tokens", type=int, default=50000, help="Max tokens per response")
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--output", default="website_dataset.jsonl", help="Output JSONL file")
     parser.add_argument("--delay", type=float, default=1.0, help="Seconds to wait between requests")
