@@ -106,14 +106,13 @@
       <ol style="line-height:2">
         <li>The Distillation Attack story</li>
         <li>How neural networks learn</li>
-        <li>Supervised Fine-Tuning (SFT)</li>
         <li>Knowledge Distillation</li>
       </ol>
     </div>
     <div>
-      <ol start="5" style="line-height:2">
+      <ol start="4" style="line-height:2">
+        <li>Supervised Fine-Tuning (SFT)</li>
         <li>LoRA &amp; QLoRA</li>
-        <li>Our fine-tuning pipeline</li>
         <li>Key takeaways</li>
       </ol>
     </div>
@@ -129,6 +128,13 @@
     <p style="color:#8b949e;font-size:.85em">
       Anthropic's blog post — <em>"The Distillation Attack on Claude's Extended Thinking"</em>
     </p>
+    <div style="margin-top:.8rem;text-align:center">
+      <img src="Screenshot%20from%202026-03-01%2000-37-07.png"
+           alt="Anthropic blog post screenshot"
+           style="max-height:480px;max-width:90%;border-radius:8px;
+                  border:1px solid rgba(255,255,255,.15);
+                  box-shadow:0 4px 24px rgba(0,0,0,.6)"/>
+    </div>
   </section>
 
   <section>
@@ -245,12 +251,107 @@
   </section>
 
   <section>
+    <h2>The Reality: Not Quite "Distillation"</h2>
+    <div class="cols2">
+      <div>
+        <p>
+          Despite Anthropic calling it a "distillation attack", what the labs are
+          doing is <strong>not true knowledge distillation</strong>.
+        </p>
+        <div class="warn-box" style="margin-top:.7rem">
+          <strong>True distillation</strong> requires access to the teacher's
+          <em>full probability distribution</em> over all tokens (the "soft labels" /
+          logits) — which is <strong>never exposed by any API</strong>.
+        </div>
+        <div class="highlight-box" style="margin-top:.7rem">
+          <strong>What the API returns:</strong> plain text only — the final
+          assistant reply. Thinking tokens are stripped server-side
+          before the response is sent.
+        </div>
+        <p style="margin-top:.7rem;font-size:.88em">
+          So what the labs are <em>actually</em> doing is closer to:
+        </p>
+        <ul style="font-size:.88em">
+          <li><strong>Data synthesis</strong> — using Claude to generate
+              high-quality training examples</li>
+          <li><strong>Imitation learning / SFT</strong> — training a smaller
+              model to reproduce Claude-style outputs</li>
+        </ul>
+      </div>
+      <!-- SVG: API boundary illustration -->
+      <div>
+        <svg viewBox="0 0 280 310" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+          <!-- Claude server side -->
+          <rect x="10" y="10" width="260" height="130" rx="8"
+                fill="rgba(248,81,73,.07)" stroke="#f85149" stroke-width="1.5"
+                stroke-dasharray="6,3"/>
+          <text x="140" y="28" text-anchor="middle" fill="#f85149" font-size="11"
+                font-weight="700">Anthropic Server (private)</text>
+
+          <!-- thinking tokens box -->
+          <rect x="25" y="38" width="230" height="36" rx="6"
+                fill="rgba(248,81,73,.2)" stroke="#f85149" stroke-width="1"/>
+          <text x="140" y="58" text-anchor="middle" fill="#f85149" font-size="12"
+                font-weight="600">💭 Thinking tokens (logits + text)</text>
+          <text x="140" y="70" text-anchor="middle" fill="#f85149" font-size="9">
+            internal scratchpad — never leaves the server
+          </text>
+
+          <!-- logits box -->
+          <rect x="25" y="84" width="230" height="36" rx="6"
+                fill="rgba(248,81,73,.15)" stroke="#f85149" stroke-width="1"/>
+          <text x="140" y="104" text-anchor="middle" fill="#f85149" font-size="12"
+                font-weight="600">📊 Softmax logits (soft labels)</text>
+          <text x="140" y="116" text-anchor="middle" fill="#f85149" font-size="9">
+            probability over 32k tokens — also never exposed
+          </text>
+
+          <!-- API boundary arrow -->
+          <line x1="140" y1="140" x2="140" y2="175" stroke="#8b949e" stroke-width="2.5"
+                marker-end="url(#apiArr)"/>
+          <rect x="60" y="149" width="160" height="22" rx="4"
+                fill="#30363d"/>
+          <text x="140" y="164" text-anchor="middle" fill="#ccc" font-size="10"
+                font-weight="600">🌐 Public API boundary</text>
+
+          <!-- what is returned -->
+          <rect x="10" y="178" width="260" height="46" rx="8"
+                fill="rgba(35,134,54,.15)" stroke="#3fb950" stroke-width="1.5"/>
+          <text x="140" y="196" text-anchor="middle" fill="#3fb950" font-size="12"
+                font-weight="700">✅ What is actually returned</text>
+          <text x="140" y="212" text-anchor="middle" fill="#ccc" font-size="11">
+            Text tokens only (the final reply)
+          </text>
+
+          <!-- labs box -->
+          <line x1="140" y1="224" x2="140" y2="252" stroke="#8b949e" stroke-width="2"
+                marker-end="url(#apiArr)"/>
+          <rect x="10" y="252" width="260" height="46" rx="8"
+                fill="rgba(88,166,255,.12)" stroke="#58a6ff" stroke-width="1.5"/>
+          <text x="140" y="270" text-anchor="middle" fill="#58a6ff" font-size="12"
+                font-weight="700">Chinese labs receive</text>
+          <text x="140" y="286" text-anchor="middle" fill="#ccc" font-size="11">
+            Plain text → SFT training data
+          </text>
+
+          <defs>
+            <marker id="apiArr" markerWidth="8" markerHeight="8"
+                    refX="8" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#8b949e"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>Why Does This Work?</h2>
     <p>
-      It works because of <strong>knowledge distillation</strong> — training a
-      smaller model on the outputs of a larger one.
-      The leaked thinking tokens gave access to <em>high-quality reasoning traces</em>
-      that otherwise cost millions of dollars to produce.
+      Even without logits, using a powerful teacher model to
+      <strong>generate training data</strong> is surprisingly effective.
+      Claude's text outputs reflect high-quality reasoning, formatting,
+      and domain knowledge built up at enormous cost.
     </p>
     <div class="cols3" style="margin-top:1rem">
       <div class="card">
@@ -263,9 +364,14 @@
         <p>DeepSeek-R1 / Qwen (smaller, local, open)</p>
       </div>
     </div>
-    <div class="highlight-box" style="margin-top:1.2rem">
-      To truly understand <em>why</em> this is so powerful, we need to understand
-      how neural networks learn from data.
+    <div class="warn-box" style="margin-top:1rem">
+      Anthropic labels this a "distillation attack" because it transfers
+      model capability — but mechanically it is <strong>imitation learning /
+      SFT on teacher-generated text</strong>, not soft-label distillation.
+    </div>
+    <div class="highlight-box" style="margin-top:.6rem">
+      To understand both techniques and why the distinction matters,
+      we need to know how neural networks learn from data.
     </div>
   </section>
 </section>
@@ -448,8 +554,8 @@
           <!-- backward gradient arrows (red, dashed) -->
           <defs>
             <marker id="bwd" markerWidth="8" markerHeight="8"
-                    refX="2" refY="3" orient="auto">
-              <path d="M8,0 L8,6 L0,3 z" fill="#f85149"/>
+                    refX="8" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#f85149"/>
             </marker>
           </defs>
           <g stroke="#f85149" stroke-width="1.5" stroke-dasharray="5,3"
@@ -468,7 +574,7 @@
           <!-- backward label -->
           <line x1="290" y1="225" x2="30" y2="225" stroke="#f85149" stroke-width="2"
                 stroke-dasharray="6,3" marker-end="url(#bwd)"/>
-          <text x="160" y="223" text-anchor="middle" fill="#f85149" font-size="11">← Backpropagation</text>
+          <text x="160" y="221" text-anchor="middle" fill="#f85149" font-size="11">← Backpropagation</text>
         </svg>
       </div>
     </div>
@@ -531,70 +637,11 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!--  PART 3 – SUPERVISED FINE-TUNING                                       -->
+<!--  PART 3 – KNOWLEDGE DISTILLATION                                       -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <section>
   <section>
-    <h2>3 · Supervised Fine-Tuning (SFT)</h2>
-    <p style="color:#8b949e">
-      Taking a pre-trained model and specialising it for a task
-    </p>
-  </section>
-
-  <section>
-    <h2>Pre-training vs Fine-Tuning</h2>
-    <div class="cols2">
-      <div class="card">
-        <h3>Pre-training <span class="tag gold">expensive</span></h3>
-        <ul>
-          <li>Trillions of tokens from the internet</li>
-          <li>Weeks/months on thousands of GPUs</li>
-          <li>Learns general language understanding</li>
-          <li>Cost: $10M – $100M+</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Fine-Tuning <span class="tag">cheap</span></h3>
-        <ul>
-          <li>Thousands to millions of curated examples</li>
-          <li>Hours to days on 1–8 GPUs</li>
-          <li>Adapts to specific tasks / styles</li>
-          <li>Cost: $10 – $1 000</li>
-        </ul>
-      </div>
-    </div>
-    <div class="highlight-box" style="margin-top:1.2rem">
-      Fine-tuning <em>continues</em> gradient descent from the pre-trained
-      weights rather than starting from scratch.
-    </div>
-  </section>
-
-  <section>
-    <h2>SFT Dataset Format</h2>
-    <p>Each training example follows a chat template:</p>
-    <pre><code class="language-json">{
-  "instruction": "Build a single-page HTML portfolio website",
-  "input":        "",
-  "output":       "&lt;!DOCTYPE html&gt;&lt;html&gt;...&lt;/html&gt;"
-}</code></pre>
-    <p>This is formatted using the model's chat template and fed to the
-       trainer as a labelled sequence:</p>
-    <pre><code class="language-text">[SYSTEM] You are an expert web developer…
-[USER]   Build a single-page HTML portfolio website
-[ASST]   &lt;!DOCTYPE html&gt;&lt;html&gt;…&lt;/html&gt;    ← loss computed here only</code></pre>
-    <div class="highlight-box">
-      The loss is masked so it is only computed on the
-      <strong>assistant turn</strong>, not on the prompt.
-    </div>
-  </section>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!--  PART 4 – KNOWLEDGE DISTILLATION                                       -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<section>
-  <section>
-    <h2>4 · Knowledge Distillation</h2>
+    <h2>3 · Knowledge Distillation</h2>
     <p style="color:#8b949e">
       Teaching a small model by imitating a large model's output distribution
     </p>
@@ -618,8 +665,7 @@
           <p style="font-size:.85em">
             Target: teacher's full distribution
             <code>[0.001, 0.05, 0.55, 0.15, …]</code><br/>
-            Every token carries some information about
-            similarity/relatedness.<br/>
+            Every token carries information about similarity/relatedness.<br/>
             <em>Much more information per step.</em>
           </p>
         </div>
@@ -673,14 +719,15 @@
   <section>
     <h2>Dataset Distillation — The Simpler Variant</h2>
     <p>
-      You don't always need access to the teacher's logits.
-      The <strong>dataset distillation</strong> approach (used in the attack) just needs
-      the teacher's <em>text outputs</em>:
+      True logit-level distillation requires access to the teacher's internal
+      probability distribution — <strong>unavailable via any public API</strong>.
+      The <em>dataset distillation</em> approach only needs the teacher's
+      <strong>text outputs</strong>:
     </p>
     <div class="cols3" style="margin-top:.8rem">
       <div class="card" style="text-align:center">
         <h3>1. Generate</h3>
-        <p>Query the teacher model with many prompts → collect responses</p>
+        <p>Query the teacher model with many prompts → collect text responses</p>
       </div>
       <div class="card" style="text-align:center">
         <h3>2. Curate</h3>
@@ -691,10 +738,70 @@
         <p>Standard SFT on student model using teacher-generated data</p>
       </div>
     </div>
-    <div class="highlight-box" style="margin-top:1rem">
-      This is <em>exactly</em> what our <code>generate_training_data.py</code> →
-      <code>train_model.py</code> pipeline does —
-      using Claude / GPT-4o as the teacher and Llama-3.2-3B as the student.
+    <div class="warn-box" style="margin-top:.8rem">
+      This is what the Chinese labs are actually doing — and what Anthropic's
+      blog calls a "distillation attack". Technically it is
+      <strong>imitation learning on teacher-generated text</strong>,
+      not soft-label distillation.
+    </div>
+  </section>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!--  PART 4 – SUPERVISED FINE-TUNING                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <section>
+    <h2>4 · Supervised Fine-Tuning (SFT)</h2>
+    <p style="color:#8b949e">
+      Taking a pre-trained model and specialising it for a task
+    </p>
+  </section>
+
+  <section>
+    <h2>Pre-training vs Fine-Tuning</h2>
+    <div class="cols2">
+      <div class="card">
+        <h3>Pre-training <span class="tag gold">expensive</span></h3>
+        <ul>
+          <li>Trillions of tokens from the internet</li>
+          <li>Weeks/months on thousands of GPUs</li>
+          <li>Learns general language understanding</li>
+          <li>Cost: $10M – $100M+</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Fine-Tuning <span class="tag">cheap</span></h3>
+        <ul>
+          <li>Thousands to millions of curated examples</li>
+          <li>Hours to days on 1–8 GPUs</li>
+          <li>Adapts to specific tasks / styles</li>
+          <li>Cost: $10 – $1 000</li>
+        </ul>
+      </div>
+    </div>
+    <div class="highlight-box" style="margin-top:1.2rem">
+      Fine-tuning <em>continues</em> gradient descent from the pre-trained
+      weights rather than starting from scratch.
+    </div>
+  </section>
+
+  <section>
+    <h2>SFT Dataset Format</h2>
+    <p>Each training example follows a chat template:</p>
+    <pre><code class="language-json">{
+  "instruction": "Build a single-page HTML portfolio website",
+  "input":        "",
+  "output":       "&lt;!DOCTYPE html&gt;&lt;html&gt;...&lt;/html&gt;"
+}</code></pre>
+    <p>This is formatted using the model's chat template and fed to the
+       trainer as a labelled sequence:</p>
+    <pre><code class="language-text">[SYSTEM] You are an expert web developer…
+[USER]   Build a single-page HTML portfolio website
+[ASST]   &lt;!DOCTYPE html&gt;&lt;html&gt;…&lt;/html&gt;    ← loss computed here only</code></pre>
+    <div class="highlight-box">
+      The loss is masked so it is only computed on the
+      <strong>assistant turn</strong>, not on the prompt.
     </div>
   </section>
 </section>
@@ -1038,188 +1145,18 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!--  PART 6 – OUR PIPELINE                                                 -->
+<!--  PART 6 – KEY TAKEAWAYS                                                -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <section>
-  <section>
-    <h2>6 · Our Fine-Tuning Pipeline</h2>
-    <p style="color:#8b949e">
-      Connecting the theory to the actual code in this repo
-    </p>
-  </section>
-
-  <section>
-    <h2>Pipeline Overview</h2>
-    <!-- SVG: pipeline flow -->
-    <div style="text-align:center;margin:.5rem 0">
-      <svg viewBox="0 0 680 100" xmlns="http://www.w3.org/2000/svg"
-           style="width:min(100%,680px)">
-        <defs>
-          <marker id="pArr" markerWidth="8" markerHeight="8"
-                  refX="6" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L8,3 z" fill="#8b949e"/>
-          </marker>
-        </defs>
-
-        <!-- boxes -->
-        <rect x="5"   y="25" width="130" height="50" rx="8" fill="#1f6feb" opacity=".85"/>
-        <text x="70"  y="47" text-anchor="middle" class="node-label">1. Generate</text>
-        <text x="70"  y="63" text-anchor="middle" fill="#ccc" font-size="10">generate_training_data.py</text>
-        <text x="70"  y="76" text-anchor="middle" fill="#8b949e" font-size="9">Claude via OpenRouter</text>
-
-        <line x1="135" y1="50" x2="155" y2="50" stroke="#8b949e" stroke-width="2" marker-end="url(#pArr)"/>
-
-        <rect x="155" y="25" width="130" height="50" rx="8" fill="#9e6a03" opacity=".85"/>
-        <text x="220" y="47" text-anchor="middle" class="node-label">2. Eval (base)</text>
-        <text x="220" y="63" text-anchor="middle" fill="#ccc" font-size="10">evaluate_model.py</text>
-        <text x="220" y="76" text-anchor="middle" fill="#8b949e" font-size="9">HTML output files</text>
-
-        <line x1="285" y1="50" x2="305" y2="50" stroke="#8b949e" stroke-width="2" marker-end="url(#pArr)"/>
-
-        <rect x="305" y="25" width="130" height="50" rx="8" fill="#238636" opacity=".85"/>
-        <text x="370" y="47" text-anchor="middle" class="node-label">3. Fine-Tune</text>
-        <text x="370" y="63" text-anchor="middle" fill="#ccc" font-size="10">train_model.py</text>
-        <text x="370" y="76" text-anchor="middle" fill="#8b949e" font-size="9">Unsloth QLoRA</text>
-
-        <line x1="435" y1="50" x2="455" y2="50" stroke="#8b949e" stroke-width="2" marker-end="url(#pArr)"/>
-
-        <rect x="455" y="25" width="105" height="50" rx="8" fill="#9e6a03" opacity=".75"/>
-        <text x="508" y="47" text-anchor="middle" class="node-label">4. Eval (FT)</text>
-        <text x="508" y="63" text-anchor="middle" fill="#ccc" font-size="10">evaluate_model.py</text>
-        <text x="508" y="76" text-anchor="middle" fill="#8b949e" font-size="9">Compare quality</text>
-
-        <line x1="560" y1="50" x2="578" y2="50" stroke="#8b949e" stroke-width="2" marker-end="url(#pArr)"/>
-
-        <rect x="578" y="25" width="96" height="50" rx="8" fill="#388bfd" opacity=".75"/>
-        <text x="626" y="47" text-anchor="middle" class="node-label">5. GGUF</text>
-        <text x="626" y="63" text-anchor="middle" fill="#ccc" font-size="10">train_model.py</text>
-        <text x="626" y="76" text-anchor="middle" fill="#8b949e" font-size="9">save_gguf()</text>
-      </svg>
-    </div>
-
-    <div class="cols2" style="margin-top:.5rem">
-      <div class="card">
-        <h3>Teacher → Student</h3>
-        <p style="font-size:.85em">
-          Claude 3.5 Sonnet generates 200 HTML examples.<br/>
-          Llama-3.2-3B (student) is fine-tuned on them.<br/>
-          <strong>Pure dataset distillation.</strong>
-        </p>
-      </div>
-      <div class="card">
-        <h3>Local Model Support</h3>
-        <p style="font-size:.85em">
-          <code>train(model_name="./my_local_weights")</code><br/>
-          Path validated: exists, is HF dir, has weights,
-          has <code>config.json</code>.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>train_model.py — Key Code</h2>
-    <div class="cols2" style="font-size:.88em">
-      <div>
-        <p><strong>Local model validation:</strong></p>
-        <pre><code class="language-python">def validate_local_model(path):
-    if not os.path.exists(path):
-        raise FileNotFoundError(...)
-    if not os.path.isdir(path):
-        raise NotADirectoryError(...)
-    if not os.path.isfile(
-            os.path.join(path, "config.json")):
-        raise ValueError(...)
-    weight_files = [
-        f for f in os.listdir(path)
-        if os.path.splitext(f)[1]
-           in {".safetensors", ".bin"}
-    ]
-    if not weight_files:
-        raise ValueError(...)</code></pre>
-      </div>
-      <div>
-        <p><strong>GGUF export:</strong></p>
-        <pre><code class="language-python">def save_gguf(
-    adapter_dir,
-    output_dir=None,
-    quantization_method="q4_k_m",
-    model_name=DEFAULT_MODEL,
-    ...
-):
-    # validate inputs
-    # load base + adapter
-    model = PeftModel.from_pretrained(
-        model, adapter_dir)
-    # export
-    model.save_pretrained_gguf(
-        output_dir, tokenizer,
-        quantization_method=quant)</code></pre>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>GGUF — What &amp; Why?</h2>
-    <div class="cols2">
-      <div>
-        <p>
-          <strong>GGUF</strong> (GPT-Generated Unified Format) is the file format
-          used by <strong>llama.cpp</strong> and <strong>Ollama</strong> for
-          local CPU/GPU inference.
-        </p>
-        <p style="margin-top:.7rem">
-          After fine-tuning with LoRA we can:
-        </p>
-        <ol>
-          <li>Merge the adapter into the base model</li>
-          <li>Quantise to 4-bit (q4_k_m) or 8-bit (q8_0)</li>
-          <li>Export as a single <code>.gguf</code> file</li>
-        </ol>
-        <div class="highlight-box" style="margin-top:.8rem;font-size:.85em">
-          Result: a 2–4 GB file that runs on any laptop with
-          8 GB RAM — no GPU required.
-        </div>
-      </div>
-      <div class="card">
-        <h3>Supported quantizations</h3>
-        <table style="width:100%;font-size:.8em;border-collapse:collapse">
-          <tr style="color:#58a6ff">
-            <th style="text-align:left;padding:4px">Method</th>
-            <th style="text-align:right;padding:4px">Size (7B)</th>
-            <th style="text-align:center;padding:4px">Quality</th>
-          </tr>
-          <tr><td style="padding:3px">f16</td>    <td style="text-align:right">14 GB</td> <td style="text-align:center">★★★★★</td></tr>
-          <tr><td style="padding:3px">q8_0</td>   <td style="text-align:right">7 GB</td>  <td style="text-align:center">★★★★★</td></tr>
-          <tr style="background:rgba(35,134,54,.12)">
-            <td style="padding:3px"><strong>q4_k_m</strong></td>
-            <td style="text-align:right"><strong>4 GB</strong></td>
-            <td style="text-align:center"><strong>★★★★☆</strong></td>
-          </tr>
-          <tr><td style="padding:3px">q4_0</td>   <td style="text-align:right">3.8 GB</td><td style="text-align:center">★★★☆☆</td></tr>
-          <tr><td style="padding:3px">q2_k</td>   <td style="text-align:right">2.7 GB</td><td style="text-align:center">★★☆☆☆</td></tr>
-        </table>
-        <p style="font-size:.75em;color:#8b949e;margin-top:.5rem">
-          q4_k_m = default, recommended
-        </p>
-      </div>
-    </div>
-  </section>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!--  PART 7 – KEY TAKEAWAYS                                                -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<section>
-  <h2>7 · Key Takeaways</h2>
+  <h2>6 · Key Takeaways</h2>
   <div class="cols2">
     <div>
       <div class="card" style="margin-bottom:.8rem">
         <h3>🎯 The Attack</h3>
         <p style="font-size:.85em">
-          Jailbreaking a model to expose its hidden thinking tokens
-          then using those as fine-tuning data is a real, documented
-          threat that bypasses expensive safety training.
+          Chinese labs used jailbreaks to expose Claude's hidden thinking tokens
+          and built training datasets from the output — but they only received
+          text, not true soft labels. Technically: imitation learning, not distillation.
         </p>
       </div>
       <div class="card">
@@ -1232,11 +1169,11 @@
     </div>
     <div>
       <div class="card" style="margin-bottom:.8rem">
-        <h3>🧪 Distillation</h3>
+        <h3>🧪 Distillation vs SFT</h3>
         <p style="font-size:.85em">
-          Train a small model on a large model's outputs.
-          Soft-label distillation (KL) is richer than hard-label SFT.
-          Dataset distillation only needs text outputs.
+          True distillation uses soft labels (teacher logits — KL divergence).
+          SFT uses hard labels (text targets — cross-entropy).
+          The labs did the latter with teacher-generated text.
         </p>
       </div>
       <div class="card">
