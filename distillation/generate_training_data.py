@@ -9,8 +9,18 @@ Topics and instruction templates are loaded from a JSON prompts file
 
 Usage:
     python generate_training_data.py \
+        --provider     openrouter \
         --api_key      YOUR_OPENROUTER_KEY \
-        --model        anthropic/claude-3.5-sonnet \
+        --model        qwen/qwen3-235b-a22b-thinking-2507 \
+        --n_samples    200 \
+        --output       website_dataset.jsonl \
+        --prompts_file prompts.json
+
+    # Hugging Face Router example:
+    python generate_training_data.py \
+        --provider     huggingface \
+        --api_key      YOUR_HF_TOKEN \
+        --model        deepseek-ai/DeepSeek-R1-0528:together \
         --n_samples    200 \
         --output       website_dataset.jsonl \
         --prompts_file prompts.json
@@ -19,6 +29,7 @@ Usage:
 import argparse
 import json
 import os
+import random
 import time
 import requests
 from tqdm import tqdm
@@ -58,6 +69,22 @@ def build_prompt(topic: str, templates: list[str], template_idx: int = 0) -> str
 # ---------------------------------------------------------------------------
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+HUGGINGFACE_ROUTER_URL = "https://router.huggingface.co/v1/chat/completions"
+
+
+def _compute_retry_wait(resp: requests.Response | None, attempt: int, backoff: float) -> float:
+    """Use Retry-After when available, otherwise exponential backoff + jitter."""
+    if resp is not None:
+        retry_after = resp.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return max(float(retry_after), 1.0)
+            except ValueError:
+                pass
+
+    base_wait = backoff * (2 ** attempt)
+    jitter = random.uniform(0.0, 1.0)
+    return min(base_wait + jitter, 120.0)
 
 
 def query_openrouter(
@@ -66,8 +93,8 @@ def query_openrouter(
     model: str,
     max_tokens: int = 4096,
     temperature: float = 0.7,
-    retries: int = 3,
-    backoff: float = 5.0,
+    retries: int = 6,
+    backoff: float = 2.0,
 ) -> str | None:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -82,15 +109,135 @@ def query_openrouter(
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
+    non_retriable_statuses = {400, 401, 403, 404}
     for attempt in range(retries):
         try:
-            resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=120)
+            resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=180)
+
+            if resp.status_code == 429:
+                wait = _compute_retry_wait(resp, attempt, backoff)
+                print(
+                    f"  [attempt {attempt + 1}/{retries}] 429 rate-limited. "
+                    f"Retrying in {wait:.1f}s ..."
+                )
+                time.sleep(wait)
+                continue
+
+            if resp.status_code in non_retriable_statuses:
+                detail = ""
+                try:
+                    err = resp.json().get("error", {})
+                    detail = err.get("message") or err.get("code") or ""
+                except Exception:  # noqa: BLE001
+                    detail = resp.text[:300]
+                raise RuntimeError(
+                    f"OpenRouter request failed with HTTP {resp.status_code}. "
+                    f"This is usually non-retriable (e.g., invalid/unavailable model). "
+                    f"Model='{model}'. Details: {detail}"
+                )
+
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"].strip()
+
+        except RuntimeError:
+            raise
+
+        except requests.exceptions.HTTPError as exc:
+            resp = exc.response
+            wait = _compute_retry_wait(resp, attempt, backoff)
+            status = resp.status_code if resp is not None else "unknown"
+            print(
+                f"  [attempt {attempt + 1}/{retries}] HTTP {status}: {exc}. "
+                f"Retrying in {wait:.1f}s ..."
+            )
+            time.sleep(wait)
+
         except Exception as exc:  # noqa: BLE001
-            wait = backoff * (attempt + 1)
-            print(f"  [attempt {attempt + 1}/{retries}] Error: {exc}. Retrying in {wait}s …")
+            wait = min(backoff * (2 ** attempt) + random.uniform(0.0, 1.0), 120.0)
+            print(
+                f"  [attempt {attempt + 1}/{retries}] Error: {exc}. "
+                f"Retrying in {wait:.1f}s ..."
+            )
+            time.sleep(wait)
+    return None
+
+
+def query_huggingface_router(
+    prompt: str,
+    hf_token: str,
+    model: str,
+    max_tokens: int = 4096,
+    temperature: float = 0.7,
+    retries: int = 6,
+    backoff: float = 2.0,
+) -> str | None:
+    headers = {
+        "Authorization": f"Bearer {hf_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    non_retriable_statuses = {400, 401, 403, 404}
+    for attempt in range(retries):
+        try:
+            resp = requests.post(HUGGINGFACE_ROUTER_URL, headers=headers, json=payload, timeout=180)
+
+            if resp.status_code == 429:
+                wait = _compute_retry_wait(resp, attempt, backoff)
+                print(
+                    f"  [attempt {attempt + 1}/{retries}] 429 rate-limited (HF Router). "
+                    f"Retrying in {wait:.1f}s ..."
+                )
+                time.sleep(wait)
+                continue
+
+            if resp.status_code in non_retriable_statuses:
+                detail = ""
+                try:
+                    err = resp.json().get("error", {})
+                    if isinstance(err, dict):
+                        detail = err.get("message") or err.get("code") or ""
+                    else:
+                        detail = str(err)
+                except Exception:  # noqa: BLE001
+                    detail = resp.text[:300]
+                raise RuntimeError(
+                    f"Hugging Face Router request failed with HTTP {resp.status_code}. "
+                    f"This is usually non-retriable (e.g., invalid/unavailable model). "
+                    f"Model='{model}'. Details: {detail}"
+                )
+
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+
+        except RuntimeError:
+            raise
+
+        except requests.exceptions.HTTPError as exc:
+            resp = exc.response
+            wait = _compute_retry_wait(resp, attempt, backoff)
+            status = resp.status_code if resp is not None else "unknown"
+            print(
+                f"  [attempt {attempt + 1}/{retries}] HF Router HTTP {status}: {exc}. "
+                f"Retrying in {wait:.1f}s ..."
+            )
+            time.sleep(wait)
+
+        except Exception as exc:  # noqa: BLE001
+            wait = min(backoff * (2 ** attempt) + random.uniform(0.0, 1.0), 120.0)
+            print(
+                f"  [attempt {attempt + 1}/{retries}] HF Router error: {exc}. "
+                f"Retrying in {wait:.1f}s ..."
+            )
             time.sleep(wait)
     return None
 
@@ -100,7 +247,7 @@ def query_openrouter(
 # ---------------------------------------------------------------------------
 
 def generate_dataset(
-    api_key: str,
+    api_key: str | None = None,
     output: str = "website_dataset.jsonl",
     model: str = "qwen/qwen3-235b-a22b-thinking-2507",
     n_samples: int = 200,
@@ -108,11 +255,13 @@ def generate_dataset(
     temperature: float = 0.7,
     delay: float = 1.0,
     prompts_file: str = "prompts.json",
+    provider: str = "openrouter",
 ) -> None:
     """Generate website HTML training data via OpenRouter and save to a JSONL file.
 
     Args:
-        api_key:      OpenRouter API key.
+        api_key:      Router API token. For OpenRouter this is OPENROUTER_API_KEY;
+                      for Hugging Face Router this is HF_TOKEN.
         output:       Path of the output JSONL file.
         model:        OpenRouter model id to use as the teacher.
         n_samples:    Total number of training samples to generate.
@@ -120,12 +269,26 @@ def generate_dataset(
         temperature:  Sampling temperature.
         delay:        Seconds to wait between API requests.
         prompts_file: Path to the JSON file with training_topics and instruction_templates.
+        provider:     Inference provider: 'openrouter' or 'huggingface'.
     """
-    if not api_key:
-        raise ValueError(
-            "OpenRouter API key is required. "
-            "Pass api_key= explicitly or set the OPENROUTER_API_KEY environment variable."
-        )
+    provider = provider.lower().strip()
+    if provider not in {"openrouter", "huggingface"}:
+        raise ValueError("provider must be 'openrouter' or 'huggingface'.")
+
+    if provider == "openrouter":
+        api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "OpenRouter API key is required when provider='openrouter'. "
+                "Pass api_key= explicitly or set OPENROUTER_API_KEY."
+            )
+    else:
+        api_key = api_key or os.getenv("HF_TOKEN")
+        if not api_key:
+            raise ValueError(
+                "Hugging Face token is required when provider='huggingface'. "
+                "Pass api_key= explicitly or set HF_TOKEN."
+            )
 
     topics, templates = load_prompts(prompts_file)
     print(f"Loaded {len(topics)} topics and {len(templates)} templates from {prompts_file}.")
@@ -155,6 +318,12 @@ def generate_dataset(
                 model=model,
                 max_tokens=max_tokens,
                 temperature=temperature,
+            ) if provider == "openrouter" else query_huggingface_router(
+                prompt=instruction,
+                hf_token=api_key,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
             if response:
                 record = {
@@ -176,7 +345,17 @@ def generate_dataset(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate website HTML training data via OpenRouter.")
-    parser.add_argument("--api_key", default=os.getenv("OPENROUTER_API_KEY"), help="OpenRouter API key")
+    parser.add_argument(
+        "--provider",
+        choices=["openrouter", "huggingface"],
+        default="openrouter",
+        help="Inference provider for generating teacher responses",
+    )
+    parser.add_argument(
+        "--api_key",
+        default=None,
+        help="Router API token. Uses OPENROUTER_API_KEY for openrouter or HF_TOKEN for huggingface if omitted",
+    )
     parser.add_argument("--model", default="qwen/qwen3-235b-a22b-thinking-2507", help="OpenRouter model id")
     parser.add_argument("--n_samples", type=int, default=200, help="Total samples to generate")
     parser.add_argument("--max_tokens", type=int, default=50000, help="Max tokens per response")
@@ -199,6 +378,7 @@ def main() -> None:
         temperature=args.temperature,
         delay=args.delay,
         prompts_file=args.prompts_file,
+        provider=args.provider,
     )
 
 

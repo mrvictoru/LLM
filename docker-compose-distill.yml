@@ -11,6 +11,8 @@ services:
     command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--NotebookApp.token=${JUPYTER_TOKEN:-}"]
     ports:
       - "8888:8888"
+    env_file:
+      - .env
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - HF_TOKEN=${HF_TOKEN}

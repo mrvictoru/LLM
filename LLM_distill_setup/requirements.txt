@@ -1,7 +1,7 @@
 jupyter
 ipywidgets
 torch
-unsloth[cu121-torch240]
+unsloth
 trl
 peft
 accelerate
