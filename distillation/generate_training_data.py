@@ -30,6 +30,7 @@ import argparse
 import json
 import os
 import random
+import re
 import time
 import requests
 from tqdm import tqdm
@@ -62,6 +63,85 @@ def load_prompts(prompts_file: str) -> tuple[list[str], list[str]]:
 def build_prompt(topic: str, templates: list[str], template_idx: int = 0) -> str:
     tmpl = templates[template_idx % len(templates)]
     return tmpl.format(topic=topic)
+
+
+def extract_html(raw: str) -> str:
+    """Strip markdown code fences if the model wrapped its output."""
+    if "```html" in raw:
+        raw = raw.split("```html", 1)[1]
+        raw = raw.split("```", 1)[0]
+    elif "```" in raw:
+        raw = raw.split("```", 1)[1]
+        raw = raw.split("```", 1)[0]
+    return raw.strip()
+
+
+def _safe_filename(text: str, max_len: int = 80) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
+    if not cleaned:
+        cleaned = "sample"
+    return cleaned[:max_len]
+
+
+def export_jsonl_outputs_to_html(
+    jsonl_path: str,
+    html_output_dir: str,
+    output_field: str = "output",
+    html_path_field: str = "output_file",
+    index_output_path: str | None = None,
+) -> str:
+    """Export outputs from a JSONL dataset to HTML files and write a path-index JSONL.
+
+    Args:
+        jsonl_path:        Source JSONL file containing model outputs.
+        html_output_dir:   Directory to store generated HTML files.
+        output_field:      Record key containing raw HTML/text output.
+        html_path_field:   Key name to store output HTML path in index records.
+        index_output_path: Optional path for the index JSONL.
+
+    Returns:
+        Path to the generated index JSONL file.
+    """
+    if not os.path.exists(jsonl_path):
+        raise FileNotFoundError(f"JSONL file not found: {jsonl_path}")
+
+    os.makedirs(html_output_dir, exist_ok=True)
+    index_output_path = index_output_path or f"{jsonl_path}.html_index.jsonl"
+
+    exported = 0
+    with open(jsonl_path, "r", encoding="utf-8") as in_fh, open(
+        index_output_path, "w", encoding="utf-8"
+    ) as idx_fh:
+        for line_num, line in enumerate(in_fh, start=1):
+            line = line.strip()
+            if not line:
+                continue
+
+            record = json.loads(line)
+            instruction = record.get("instruction", "")
+            raw_output = record.get(output_field)
+            if not raw_output:
+                continue
+
+            html = extract_html(str(raw_output))
+            file_stem = _safe_filename(instruction or f"sample-{line_num}")
+            file_name = f"{line_num:05d}_{file_stem}.html"
+            out_path = os.path.join(html_output_dir, file_name)
+
+            with open(out_path, "w", encoding="utf-8") as html_fh:
+                html_fh.write(html)
+
+            idx_record = {
+                "instruction": instruction,
+                "input": record.get("input", ""),
+                html_path_field: out_path,
+            }
+            idx_fh.write(json.dumps(idx_record) + "\n")
+            exported += 1
+
+    print(f"Exported {exported} HTML files to {html_output_dir}")
+    print(f"Wrote HTML index JSONL: {index_output_path}")
+    return index_output_path
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +336,8 @@ def generate_dataset(
     delay: float = 1.0,
     prompts_file: str = "prompts.json",
     provider: str = "openrouter",
+    store_mode: str = "inline",
+    html_output_dir: str | None = None,
 ) -> None:
     """Generate website HTML training data via OpenRouter and save to a JSONL file.
 
@@ -270,10 +352,17 @@ def generate_dataset(
         delay:        Seconds to wait between API requests.
         prompts_file: Path to the JSON file with training_topics and instruction_templates.
         provider:     Inference provider: 'openrouter' or 'huggingface'.
+        store_mode:   How outputs are stored: 'inline' (JSONL output text) or
+                      'file_path' (write .html files and store output_file path).
+        html_output_dir: Directory for HTML files when store_mode='file_path'.
     """
     provider = provider.lower().strip()
     if provider not in {"openrouter", "huggingface"}:
         raise ValueError("provider must be 'openrouter' or 'huggingface'.")
+
+    store_mode = store_mode.lower().strip()
+    if store_mode not in {"inline", "file_path"}:
+        raise ValueError("store_mode must be 'inline' or 'file_path'.")
 
     if provider == "openrouter":
         api_key = api_key or os.getenv("OPENROUTER_API_KEY")
@@ -293,6 +382,12 @@ def generate_dataset(
     topics, templates = load_prompts(prompts_file)
     print(f"Loaded {len(topics)} topics and {len(templates)} templates from {prompts_file}.")
 
+    if store_mode == "file_path":
+        if not html_output_dir:
+            base_dir = os.path.dirname(os.path.abspath(output)) or "."
+            html_output_dir = os.path.join(base_dir, "html_outputs")
+        os.makedirs(html_output_dir, exist_ok=True)
+
     # Cycle through topics and templates to reach n_samples
     samples = []
     for i in range(n_samples):
@@ -309,7 +404,7 @@ def generate_dataset(
         print(f"Resuming — {len(existing)} samples already in {output}.")
 
     with open(output, "a", encoding="utf-8") as out_fh:
-        for instruction in tqdm(samples, desc="Generating"):
+        for sample_idx, instruction in enumerate(tqdm(samples, desc="Generating"), start=1):
             if instruction in existing:
                 continue
             response = query_openrouter(
@@ -326,11 +421,22 @@ def generate_dataset(
                 temperature=temperature,
             )
             if response:
+                html = extract_html(response)
                 record = {
                     "instruction": instruction,
                     "input": "",
-                    "output": response,
                 }
+
+                if store_mode == "inline":
+                    record["output"] = html
+                else:
+                    file_stem = _safe_filename(instruction or f"sample-{sample_idx}")
+                    file_name = f"{sample_idx:05d}_{file_stem}.html"
+                    out_path = os.path.join(html_output_dir, file_name)
+                    with open(out_path, "w", encoding="utf-8") as html_fh:
+                        html_fh.write(html)
+                    record["output_file"] = out_path
+
                 out_fh.write(json.dumps(record) + "\n")
                 out_fh.flush()
                 existing.add(instruction)
@@ -362,6 +468,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--output", default="website_dataset.jsonl", help="Output JSONL file")
     parser.add_argument("--delay", type=float, default=1.0, help="Seconds to wait between requests")
+    parser.add_argument(
+        "--store_mode",
+        choices=["inline", "file_path"],
+        default="inline",
+        help="Store output directly in JSONL or as HTML files with output_file paths",
+    )
+    parser.add_argument(
+        "--html_output_dir",
+        default=None,
+        help="Directory for HTML files when --store_mode file_path (default: <output_dir>/html_outputs)",
+    )
     parser.add_argument("--prompts_file", default="prompts.json",
                         help="Path to JSON file with training_topics and instruction_templates")
     return parser.parse_args()
@@ -379,6 +496,8 @@ def main() -> None:
         delay=args.delay,
         prompts_file=args.prompts_file,
         provider=args.provider,
+        store_mode=args.store_mode,
+        html_output_dir=args.html_output_dir,
     )
 
 

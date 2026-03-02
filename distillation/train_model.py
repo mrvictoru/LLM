@@ -165,10 +165,22 @@ def format_sample(record: dict, tokenizer) -> dict:
     if record.get("input"):
         user_content = f"{user_content}\n\n{record['input']}"
 
+    assistant_content = record.get("output")
+    if assistant_content is None:
+        output_file = record.get("output_file")
+        if output_file:
+            if not os.path.exists(output_file):
+                raise FileNotFoundError(f"Referenced output_file does not exist: {output_file}")
+            with open(output_file, "r", encoding="utf-8") as fh:
+                assistant_content = fh.read()
+
+    if assistant_content is None:
+        raise ValueError("Record must contain either 'output' or 'output_file'.")
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
-        {"role": "assistant", "content": record["output"]},
+        {"role": "assistant", "content": assistant_content},
     ]
     text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
     return {"text": text}
