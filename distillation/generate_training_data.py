@@ -24,6 +24,16 @@ Usage:
         --n_samples    200 \
         --output       website_dataset.jsonl \
         --prompts_file prompts.json
+
+    # Local model example (GGUF file or directory containing .gguf):
+    python generate_training_data.py \
+        --provider      local \
+        --local_server_url http://localhost:8080 \
+        --model         local-model \
+        --n_samples     200 \
+        --output        website_dataset.jsonl \
+        --store_mode    file_path \
+        --local_ctx_size 16384
 """
 
 import argparse
@@ -150,6 +160,170 @@ def export_jsonl_outputs_to_html(
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 HUGGINGFACE_ROUTER_URL = "https://router.huggingface.co/v1/chat/completions"
+_LOCAL_MODEL_CACHE: dict = {}
+
+
+def _load_local_model_backend(
+    model_ref: str,
+    local_ctx_size: int,
+    local_gpu_layers: int,
+    local_threads: int | None,
+) -> dict:
+    cache_key = (model_ref, local_ctx_size, local_gpu_layers, local_threads)
+    cached = _LOCAL_MODEL_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        import torch
+        from unsloth import FastLanguageModel
+    except ImportError as exc:
+        raise RuntimeError(
+            "Local HF model inference requires Unsloth + torch in the current environment."
+        ) from exc
+
+    if not os.path.exists(model_ref):
+        raise FileNotFoundError(
+            f"Local provider requires a valid model path. Not found: {model_ref!r}"
+        )
+
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=model_ref,
+        max_seq_length=local_ctx_size,
+        dtype=None,
+        load_in_4bit=True,
+    )
+    FastLanguageModel.for_inference(model)
+    backend = {
+        "kind": "unsloth",
+        "model": model,
+        "tokenizer": tokenizer,
+        "torch": torch,
+        "model_path": model_ref,
+    }
+    _LOCAL_MODEL_CACHE[cache_key] = backend
+    print(f"Loaded local HF model with Unsloth: {model_ref}")
+    return backend
+
+
+def query_local_model(
+    prompt: str,
+    model: str,
+    max_tokens: int = 4096,
+    temperature: float = 0.7,
+    local_ctx_size: int = 16384,
+    local_gpu_layers: int = -1,
+    local_threads: int | None = None,
+) -> str | None:
+    backend = _load_local_model_backend(
+        model_ref=model,
+        local_ctx_size=local_ctx_size,
+        local_gpu_layers=local_gpu_layers,
+        local_threads=local_threads,
+    )
+
+    model_obj = backend["model"]
+    tokenizer = backend["tokenizer"]
+    torch_mod = backend["torch"]
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+    inputs = tokenizer.apply_chat_template(
+        messages,
+        tokenize=True,
+        add_generation_prompt=True,
+        return_tensors="pt",
+    ).to(model_obj.device)
+
+    with torch_mod.no_grad():
+        outputs = model_obj.generate(
+            input_ids=inputs,
+            max_new_tokens=max_tokens,
+            use_cache=True,
+            temperature=temperature,
+            do_sample=True,
+        )
+
+    generated = outputs[0][inputs.shape[1]:]
+    return tokenizer.decode(generated, skip_special_tokens=True).strip()
+
+
+def query_local_llamacpp_server(
+    prompt: str,
+    server_url: str,
+    model: str,
+    max_tokens: int = 4096,
+    temperature: float = 0.7,
+    retries: int = 6,
+    backoff: float = 2.0,
+) -> str | None:
+    base = server_url.rstrip("/")
+    endpoint = f"{base}/v1/chat/completions"
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    non_retriable_statuses = {400, 401, 403, 404}
+    for attempt in range(retries):
+        try:
+            resp = requests.post(endpoint, json=payload, timeout=180)
+
+            if resp.status_code == 429:
+                wait = _compute_retry_wait(resp, attempt, backoff)
+                print(
+                    f"  [attempt {attempt + 1}/{retries}] 429 rate-limited (local server). "
+                    f"Retrying in {wait:.1f}s ..."
+                )
+                time.sleep(wait)
+                continue
+
+            if resp.status_code in non_retriable_statuses:
+                detail = ""
+                try:
+                    err = resp.json().get("error", {})
+                    if isinstance(err, dict):
+                        detail = err.get("message") or err.get("code") or ""
+                    else:
+                        detail = str(err)
+                except Exception:  # noqa: BLE001
+                    detail = resp.text[:300]
+                raise RuntimeError(
+                    f"Local llama.cpp server request failed with HTTP {resp.status_code}. "
+                    f"URL='{endpoint}'. Model='{model}'. Details: {detail}"
+                )
+
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+
+        except RuntimeError:
+            raise
+
+        except requests.exceptions.HTTPError as exc:
+            resp = exc.response
+            wait = _compute_retry_wait(resp, attempt, backoff)
+            status = resp.status_code if resp is not None else "unknown"
+            print(
+                f"  [attempt {attempt + 1}/{retries}] local server HTTP {status}: {exc}. "
+                f"Retrying in {wait:.1f}s ..."
+            )
+            time.sleep(wait)
+
+        except Exception as exc:  # noqa: BLE001
+            wait = min(backoff * (2 ** attempt) + random.uniform(0.0, 1.0), 120.0)
+            print(
+                f"  [attempt {attempt + 1}/{retries}] local server error: {exc}. "
+                f"Retrying in {wait:.1f}s ..."
+            )
+            time.sleep(wait)
+    return None
 
 
 def _compute_retry_wait(resp: requests.Response | None, attempt: int, backoff: float) -> float:
@@ -338,6 +512,10 @@ def generate_dataset(
     provider: str = "openrouter",
     store_mode: str = "inline",
     html_output_dir: str | None = None,
+    local_ctx_size: int = 16384,
+    local_gpu_layers: int = -1,
+    local_threads: int | None = None,
+    local_server_url: str | None = None,
 ) -> None:
     """Generate website HTML training data via OpenRouter and save to a JSONL file.
 
@@ -351,14 +529,18 @@ def generate_dataset(
         temperature:  Sampling temperature.
         delay:        Seconds to wait between API requests.
         prompts_file: Path to the JSON file with training_topics and instruction_templates.
-        provider:     Inference provider: 'openrouter' or 'huggingface'.
+        provider:     Inference provider: 'openrouter', 'huggingface', or 'local'.
         store_mode:   How outputs are stored: 'inline' (JSONL output text) or
                       'file_path' (write .html files and store output_file path).
         html_output_dir: Directory for HTML files when store_mode='file_path'.
+        local_ctx_size: Context size for local inference backends.
+        local_gpu_layers: Kept for backward compatibility (unused for server mode).
+        local_threads: Number of CPU threads for local HF model backend.
+        local_server_url: Optional llama.cpp-compatible server URL for local provider.
     """
     provider = provider.lower().strip()
-    if provider not in {"openrouter", "huggingface"}:
-        raise ValueError("provider must be 'openrouter' or 'huggingface'.")
+    if provider not in {"openrouter", "huggingface", "local"}:
+        raise ValueError("provider must be 'openrouter', 'huggingface', or 'local'.")
 
     store_mode = store_mode.lower().strip()
     if store_mode not in {"inline", "file_path"}:
@@ -371,12 +553,17 @@ def generate_dataset(
                 "OpenRouter API key is required when provider='openrouter'. "
                 "Pass api_key= explicitly or set OPENROUTER_API_KEY."
             )
-    else:
+    elif provider == "huggingface":
         api_key = api_key or os.getenv("HF_TOKEN")
         if not api_key:
             raise ValueError(
                 "Hugging Face token is required when provider='huggingface'. "
                 "Pass api_key= explicitly or set HF_TOKEN."
+            )
+    else:
+        if not model and not local_server_url:
+            raise ValueError(
+                "Local provider requires either --model (local HF path) or --local_server_url."
             )
 
     topics, templates = load_prompts(prompts_file)
@@ -407,19 +594,42 @@ def generate_dataset(
         for sample_idx, instruction in enumerate(tqdm(samples, desc="Generating"), start=1):
             if instruction in existing:
                 continue
-            response = query_openrouter(
-                prompt=instruction,
-                api_key=api_key,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            ) if provider == "openrouter" else query_huggingface_router(
-                prompt=instruction,
-                hf_token=api_key,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            if provider == "openrouter":
+                response = query_openrouter(
+                    prompt=instruction,
+                    api_key=api_key,
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            elif provider == "huggingface":
+                response = query_huggingface_router(
+                    prompt=instruction,
+                    hf_token=api_key,
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            else:
+                if local_server_url:
+                    response = query_local_llamacpp_server(
+                        prompt=instruction,
+                        server_url=local_server_url,
+                        model=model,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                    )
+                else:
+                    response = query_local_model(
+                        prompt=instruction,
+                        model=model,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        local_ctx_size=local_ctx_size,
+                        local_gpu_layers=local_gpu_layers,
+                        local_threads=local_threads,
+                    )
+
             if response:
                 html = extract_html(response)
                 record = {
@@ -453,7 +663,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate website HTML training data via OpenRouter.")
     parser.add_argument(
         "--provider",
-        choices=["openrouter", "huggingface"],
+        choices=["openrouter", "huggingface", "local"],
         default="openrouter",
         help="Inference provider for generating teacher responses",
     )
@@ -462,7 +672,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Router API token. Uses OPENROUTER_API_KEY for openrouter or HF_TOKEN for huggingface if omitted",
     )
-    parser.add_argument("--model", default="qwen/qwen3-235b-a22b-thinking-2507", help="OpenRouter model id")
+    parser.add_argument(
+        "--model",
+        default="qwen/qwen3-235b-a22b-thinking-2507",
+        help="Model id for router providers, local HF path for provider=local, or server model name for --local_server_url",
+    )
     parser.add_argument("--n_samples", type=int, default=200, help="Total samples to generate")
     parser.add_argument("--max_tokens", type=int, default=50000, help="Max tokens per response")
     parser.add_argument("--temperature", type=float, default=0.7)
@@ -478,6 +692,29 @@ def parse_args() -> argparse.Namespace:
         "--html_output_dir",
         default=None,
         help="Directory for HTML files when --store_mode file_path (default: <output_dir>/html_outputs)",
+    )
+    parser.add_argument(
+        "--local_ctx_size",
+        type=int,
+        default=16384,
+        help="Context size for local HF model inference (provider=local)",
+    )
+    parser.add_argument(
+        "--local_gpu_layers",
+        type=int,
+        default=-1,
+        help="Unused for local server mode; kept for backward compatibility.",
+    )
+    parser.add_argument(
+        "--local_threads",
+        type=int,
+        default=None,
+        help="CPU threads for local HF model backend when provider=local",
+    )
+    parser.add_argument(
+        "--local_server_url",
+        default=os.getenv("LLAMA_CPP_SERVER_URL"),
+        help="URL for a running llama.cpp-compatible OpenAI server (provider=local)",
     )
     parser.add_argument("--prompts_file", default="prompts.json",
                         help="Path to JSON file with training_topics and instruction_templates")
@@ -498,6 +735,10 @@ def main() -> None:
         provider=args.provider,
         store_mode=args.store_mode,
         html_output_dir=args.html_output_dir,
+        local_ctx_size=args.local_ctx_size,
+        local_gpu_layers=args.local_gpu_layers,
+        local_threads=args.local_threads,
+        local_server_url=args.local_server_url,
     )
 
 

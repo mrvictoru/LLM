@@ -65,7 +65,7 @@ def load_model_and_tokenizer(model_name: str, adapter_path: str | None):
 
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
-        max_seq_length=4096,
+        max_seq_length=40960,
         dtype=None,
         load_in_4bit=True,
     )
@@ -77,7 +77,7 @@ def load_model_and_tokenizer(model_name: str, adapter_path: str | None):
     return model, tokenizer
 
 
-def generate_html(model, tokenizer, instruction: str, max_new_tokens: int = 2048) -> str:
+def generate_html(model, tokenizer, instruction: str, max_new_tokens: int = 20480) -> str:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": instruction},
@@ -121,7 +121,7 @@ def evaluate(
     model_name: str,
     output_dir: str = "./eval_results",
     adapter_path: str | None = None,
-    max_new_tokens: int = 2048,
+    max_new_tokens: int = 20480,
     prompts_file: str = "prompts.json",
 ) -> list[dict]:
     """Evaluate a model on website-generation test cases and save HTML outputs.
