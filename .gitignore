@@ -29,6 +29,7 @@ __pycache__/
 distillation/website_dataset.jsonl
 distillation/outputs/
 distillation/eval_results/
+distillation/html_outputs/
 
 # environment file with secrets
 .env
