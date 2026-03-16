@@ -34,6 +34,7 @@ Usage:
 import argparse
 import json
 import os
+import torch
 
 from datasets import Dataset
 from trl import SFTTrainer, SFTConfig
@@ -44,7 +45,7 @@ from unsloth import FastLanguageModel, is_bfloat16_supported
 # ---------------------------------------------------------------------------
 
 DEFAULT_MODEL = "unsloth/Llama-3.2-3B-Instruct"
-MAX_SEQ_LENGTH = 4096
+MAX_SEQ_LENGTH = 2048
 LORA_R = 16
 LORA_ALPHA = 16
 LORA_DROPOUT = 0
@@ -200,6 +201,7 @@ def train(
     lr: float = 2e-4,
     warmup_ratio: float = 0.05,
     max_seq_length: int = MAX_SEQ_LENGTH,
+    packing: bool = False,
     load_in_4bit: bool = True,
     save_merged: bool = False,
     push_to_hub: str | None = None,
@@ -219,6 +221,9 @@ def train(
         lr:             Learning rate.
         warmup_ratio:   Fraction of steps used for LR warm-up.
         max_seq_length: Maximum sequence length for training.
+        packing:        Whether to pack multiple short samples into one
+                sequence. This improves throughput but increases peak
+                VRAM usage.
         load_in_4bit:   Whether to load the model in 4-bit quantisation.
         save_merged:    Also save a merged 16-bit model (needs more VRAM/disk).
         push_to_hub:    Optional HuggingFace repo id to push the adapter to.
@@ -291,7 +296,7 @@ def train(
         seed=42,
         max_seq_length=max_seq_length,
         dataset_text_field="text",
-        packing=True,
+        packing=packing,
     )
 
     trainer = SFTTrainer(
@@ -301,8 +306,23 @@ def train(
         args=training_args,
     )
 
-    print("Starting training …")
-    trainer.train()
+    print(
+        "Starting training ... "
+        f"(max_seq_length={max_seq_length}, packing={packing}, "
+        f"batch_size={batch_size}, grad_accum={grad_accum})"
+    )
+    try:
+        trainer.train()
+    except torch.OutOfMemoryError as exc:
+        raise RuntimeError(
+            "CUDA OOM during training. Try these settings for lower VRAM use:\n"
+            "  - max_seq_length=1024 or 1536\n"
+            "  - packing=False\n"
+            "  - batch_size=1\n"
+            "  - grad_accum=8 (to keep a similar effective batch)\n"
+            "Also consider setting environment variable "
+            "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True."
+        ) from exc
 
     # ------------------------------------------------------------------
     # 5. Save the LoRA adapter
@@ -440,6 +460,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--warmup_ratio", type=float, default=0.05)
     parser.add_argument("--max_seq_length", type=int, default=MAX_SEQ_LENGTH)
+    parser.add_argument("--packing", action="store_true", default=False,
+                        help="Enable sequence packing (faster but uses more VRAM)")
     parser.add_argument("--load_in_4bit", action="store_true", default=True,
                         help="Use 4-bit quantisation (recommended for 22 GB VRAM)")
     parser.add_argument("--save_merged", action="store_true", default=False,
@@ -468,6 +490,7 @@ def main() -> None:
         lr=args.lr,
         warmup_ratio=args.warmup_ratio,
         max_seq_length=args.max_seq_length,
+        packing=args.packing,
         load_in_4bit=args.load_in_4bit,
         save_merged=args.save_merged,
         push_to_hub=args.push_to_hub,

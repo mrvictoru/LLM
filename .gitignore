@@ -30,6 +30,7 @@ distillation/website_dataset.jsonl
 distillation/outputs/
 distillation/eval_results/
 distillation/html_outputs/
+distillation/unsloth_compiled_cache/
 
 # environment file with secrets
 .env
