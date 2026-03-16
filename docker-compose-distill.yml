@@ -1,0 +1,32 @@
+version: '3'
+services:
+  distill_dev:
+    build:
+      context: .
+      dockerfile: LLM_distill_setup/Dockerfile
+    volumes:
+      - "./distillation:/code"
+      - "./models:/code/models"
+    working_dir: /code
+    command: ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--NotebookApp.token=${JUPYTER_TOKEN:-}"]
+    ports:
+      - "8888:8888"
+    env_file:
+      - .env
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - HF_TOKEN=${HF_TOKEN}
+      - LLAMA_CPP_SERVER_URL=http://host.docker.internal:1337
+    # Ensure host.docker.internal resolves on Linux (Docker 20.10+ supports host-gateway)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  distill_data:

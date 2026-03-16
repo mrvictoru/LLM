@@ -1,0 +1,129 @@
+{
+  "_comment": "Prompts used for training data generation and model evaluation. Eval test cases must NOT appear in training_topics.",
+  "instruction_templates": [
+    "Create a single-file HTML website: {topic}.",
+    "Build a self-contained HTML page for {topic}.",
+    "Write a complete single-file HTML + CSS + JS website that implements {topic}.",
+    "Generate a responsive single-file HTML website for {topic}. Include all styles and scripts inline.",
+    "Produce a polished, self-contained HTML file that acts as {topic}.",
+    "Design and code a single HTML file that serves as {topic}. All CSS and JS must be inline.",
+    "Implement {topic} as a single self-contained HTML file with embedded styles and scripts.",
+    "Build a modern, responsive single-file HTML app for {topic}. No external dependencies."
+  ],
+  "training_topics": [
+    "a simple todo list app with add, complete, and delete functionality",
+    "a Pomodoro productivity timer with configurable work and break cycles",
+    "a kanban board with three columns: To Do, In Progress, and Done",
+    "a daily schedule planner with hourly time slots from 6 AM to midnight",
+    "a goal tracking page with labelled progress bars and percentage complete",
+    "a multi-step form wizard with validation and a progress indicator",
+    "a note-taking app with create, edit, delete, and local-storage persistence",
+    "a habit streaks tracker with a weekly checkbox grid",
+    "a project timeline as an SVG Gantt chart with task bars",
+    "a drag-and-drop sortable task list with mouse and touch support",
+    "a snake game on a canvas element with score display and restart",
+    "a tic-tac-toe game with win detection and a reset button",
+    "a memory card matching game with a flip animation",
+    "a typing speed test that measures WPM and accuracy",
+    "a number guessing game with too-high/too-low hint feedback",
+    "a 2048 sliding tile puzzle game with arrow-key controls",
+    "a Wordle-clone word guessing game with color-coded letter feedback",
+    "a multiple-choice quiz app with score tracking and result summary",
+    "a Simon Says pattern memory game with audio cues (mock beep labels)",
+    "a breakout/Arkanoid ball-and-paddle game drawn on canvas",
+    "a weather dashboard with city search and mock weather cards",
+    "a line chart of monthly sales data drawn purely with SVG polylines",
+    "a simple analytics dashboard with a bar chart and a donut chart (SVG)",
+    "a cryptocurrency price tracker with mock coin data and percentage changes",
+    "a stock portfolio summary page with mock ticker symbols and gains/losses",
+    "a fitness stats dashboard showing steps, calories burned, and sleep hours",
+    "a world time zone clock displaying six cities simultaneously",
+    "a BMI calculator with input fields and a color-coded result indicator",
+    "a currency converter with mock exchange rates and a swap button",
+    "a tip calculator that splits the bill among a configurable number of people",
+    "a unit converter supporting length, weight, and temperature",
+    "a password strength checker with a meter and a random password generator",
+    "a countdown timer to a user-specified date and time",
+    "a digital clock with hours, minutes, seconds, and AM/PM display",
+    "a color palette generator that derives shades from a user-chosen base color",
+    "a simple drawing canvas with a color picker, brush sizes, and an eraser",
+    "a Markdown previewer with a split editor and live rendered output panel",
+    "a CSS gradient generator with live preview and a copy-to-clipboard button",
+    "a regex tester where the user enters a pattern and sample text with live match highlights",
+    "a personal portfolio page for a software engineer with projects and contact sections",
+    "a minimal blog homepage with three sample posts and a sidebar",
+    "a resume / CV page with print-friendly styling and a download-PDF hint",
+    "a wedding event invitation page with RSVP form and countdown",
+    "a recipe card page with ingredients, step-by-step instructions, and serving size scaler",
+    "a book reading list tracker with titles, authors, star ratings, and read/unread status",
+    "a travel bucket list page with destination cards and a simple map placeholder",
+    "a landing page for a mobile app with hero section, feature highlights, and screenshots",
+    "a responsive pricing page with three subscription tiers and feature comparison table",
+    "a product detail page with an image carousel, size selector, and add-to-cart button",
+    "a simple e-commerce product card grid with category filter chips",
+    "a coupon/discount code redemption form with animated success or error state",
+    "a newsletter signup page with a form and an animated confirmation message",
+    "a dark-mode toggle demo with smooth CSS transition between light and dark themes",
+    "a responsive navbar with a hamburger menu that slides in on mobile",
+    "a testimonial carousel slider with auto-play and dot navigation",
+    "a FAQ accordion page with smooth expand and collapse animations",
+    "a modal dialog demo with an overlay backdrop and close-on-click-outside behavior",
+    "a sticky header that shrinks and changes background color when the user scrolls down",
+    "a skeleton loading screen placeholder that fades to content after a mock delay",
+    "a star rating component with hover state and a submitted rating display",
+    "a progress bar animation demo with multiple labelled bars animating on page load",
+    "a tooltip and popover component demo with multiple trigger elements",
+    "a tabbed interface with an animated underline indicator and lazy-loaded tab content",
+    "a data table with client-side sorting by column and a search filter input",
+    "a multi-select tag input component with keyboard and click support",
+    "a floating action button speed-dial menu that expands on click",
+    "an image gallery with lazy loading and a blurred placeholder until loaded",
+    "a login and register modal demo with client-side form validation",
+    "a user profile card with avatar, bio, stats, and a follow/unfollow toggle button",
+    "an email inbox UI mockup with read/unread states and a message preview panel",
+    "a notification bell icon with a dropdown list of mock notifications",
+    "a social media post card with like, comment, and share button interactions",
+    "a music player UI mockup with a playlist, progress bar, and play/pause controls",
+    "a podcast episode list page with play buttons and episode duration display",
+    "a simple image gallery with a lightbox overlay and keyboard navigation",
+    "a flashcard deck for learning vocabulary with flip animation and self-assessment buttons",
+    "a video streaming homepage UI with mock thumbnail cards and a search bar",
+    "an interactive SVG world map with country hover tooltips showing mock population data",
+    "a random quote generator that displays a new quote on button click with a share option",
+    "a moon phase calendar showing the current month with SVG phase icons"
+  ],
+  "eval_test_cases": [
+    {
+      "id": "weather_chart",
+      "instruction": "Build a self-contained HTML page for a 7-day weather forecast with SVG bar charts showing daily high/low temperatures and precipitation chance."
+    },
+    {
+      "id": "pixel_art_editor",
+      "instruction": "Create a single-file HTML website: a pixel art editor with a 16x16 drawing grid, a color palette toolbar, a fill-bucket tool, and a clear button."
+    },
+    {
+      "id": "chat_ui",
+      "instruction": "Write a complete single-file HTML + CSS + JS website that implements a chat application UI with message bubbles, timestamps, a message input form, and mock sent/received messages."
+    },
+    {
+      "id": "spreadsheet_grid",
+      "instruction": "Generate a responsive single-file HTML website for a mini spreadsheet with editable cells, row and column headers, and a status bar that shows the SUM of selected numeric cells."
+    },
+    {
+      "id": "saas_landing",
+      "instruction": "Produce a polished, self-contained HTML file that acts as an animated SaaS product landing page with a full-width hero section, three feature cards with icons, a testimonial quote, and a call-to-action button."
+    },
+    {
+      "id": "code_editor_ui",
+      "instruction": "Design and code a single HTML file that serves as a browser-based code editor UI with line numbers, a textarea with monospace font, syntax-coloring via CSS classes on sample code, and a Run / Copy button. All CSS and JS must be inline."
+    },
+    {
+      "id": "habit_heatmap",
+      "instruction": "Build a modern, responsive single-file HTML app for a habit tracker that displays a GitHub-style contribution heatmap for the past 52 weeks, with a legend and a hover tooltip showing the date and completion count."
+    },
+    {
+      "id": "budget_planner",
+      "instruction": "Implement a personal monthly budget planner as a single self-contained HTML file with embedded styles and scripts. It should let the user add income and expense entries, show a running balance, and display a live SVG donut chart of spending by category."
+    }
+  ]
+}

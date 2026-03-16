@@ -1,0 +1,15 @@
+jupyter
+ipywidgets
+torch
+unsloth
+trl
+peft
+accelerate
+bitsandbytes
+datasets
+transformers
+huggingface_hub
+openai
+requests
+tqdm
+numpy
